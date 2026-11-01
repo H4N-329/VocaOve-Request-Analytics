@@ -787,3 +787,34 @@ h1 {
   .settings-back-top {font-size:12px;min-height:35px}
   .settings-jump {font-size:12px;margin-top:10px}
 }
+
+
+/* v3.4 — Full-width title panel aligned with the filter panel */
+.hero {
+  padding-left:0;
+  padding-right:0;
+}
+.hero-main {
+  width:100%;
+  max-width:none;
+  min-width:0;
+  border-radius:18px;
+  padding:29px 32px;
+}
+/* Keep decorative notes to the empty right side of the wider title panel. */
+.hero-decor {
+  z-index:2;
+  right:35px;
+  top:46px;
+  opacity:.28;
+}
+@media (max-width:1000px) {
+  .hero-decor {display:none}
+}
+@media (max-width:720px) {
+  .hero {padding:22px 0 20px}
+  .hero-main {padding:20px 17px;border-radius:16px}
+}
+@media (max-width:380px) {
+  .hero-main {padding:17px 14px}
+}
