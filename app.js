@@ -1,13 +1,18 @@
-import { FIELDS, parseSheetCSV, guessMapping, createRecords, filterRecords, aggregateAll, safeHttpUrl, csvExport } from './lib/analytics.mjs';
+import { FIELDS, parseSheetCSV, guessMapping, createRecords, filterRecords, aggregateAll, safeHttpUrl, csvExport, normalizeName, userKey } from './lib/analytics.mjs';
+import { combinedAliases, cleanAliases, removeDuplicateRequests, periodFor, computeTrends } from './lib/v3.mjs';
 
 const $ = id => document.getElementById(id);
 const nf = new Intl.NumberFormat('ja-JP');
 const STATE = {
   headers: [], data: [], records: [], filtered: [], analysis: null, mapping: {},
   loading: false, source: 'sheet', gid: '0', page: 0, focus: null,
-  showAll: { songs: false, artists: false, users: false }
+  showAll: { songs: false, artists: false, users: false },
+  period: 'all', trend: null, aliases: {songs:{},artists:{},users:{}},
+  globalAliases:{songs:{},artists:{},users:{}}, localAliases:{songs:{},artists:{},users:{}},
+  dedupe: true, duplicateCount: 0, lastFetchedAt: 0, lastAttemptAt: 0,
+  lastCSV: null, lastGid: null
 };
-const MAP_IDS = { song: 'mapSong', artist: 'mapArtist', user: 'mapUser', date: 'mapDate', url: 'mapUrl' };
+const MAP_IDS = { song: 'mapSong', artist: 'mapArtist', user: 'mapUser', date: 'mapDate', url: 'mapUrl', cover: 'mapCover' };
 const RANK_FIELDS = { songs: 'song', artists: 'artist', users: 'user' };
 const MAX_CSV_SIZE = 5 * 1024 * 1024;
 const DEMO = `曲名,アーティスト,ユーザー名,投稿日,投稿URL
@@ -36,6 +41,45 @@ function status(message, kind = 'neutral') {
 function text(id, value) { $(id).textContent = value; }
 function clear(el) { el.replaceChildren(); }
 function formatMonth(ym) { return ym ? ym.replace('-', '年') + '月' : '—'; }
+function todayJST() { const parts = new Intl.DateTimeFormat('en-CA', { timeZone:'Asia/Tokyo', year:'numeric', month:'2-digit', day:'2-digit' }).formatToParts(new Date()); const obj = Object.fromEntries(parts.map(p=>[p.type,p.value])); return `${obj.year}-${obj.month}-${obj.day}`; }
+function readableTime(when) {return new Intl.DateTimeFormat('ja-JP',{timeZone:'Asia/Tokyo',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}).format(when);}
+function storageGet(key, fallback) { try { const item=localStorage.getItem(key); return item === null ? fallback : JSON.parse(item); } catch {return fallback;} }
+function storageSet(key, value) { try {localStorage.setItem(key,JSON.stringify(value));} catch {} }
+function refreshAliasState() { STATE.aliases=combinedAliases(STATE.globalAliases, STATE.localAliases); }
+async function loadGlobalAliases() {
+  try { const response=await fetch('/aliases.json',{cache:'no-store'}); if(response.ok) STATE.globalAliases=cleanAliases(await response.json()); } catch {}
+  STATE.localAliases=cleanAliases(storageGet('voca-v3-aliases',{})); refreshAliasState(); renderAliasList();
+}
+function rebuildRecords(shouldRender = true) {
+  const raw=createRecords(STATE.data,STATE.mapping,STATE.aliases);
+  const result=removeDuplicateRequests(raw,STATE.dedupe);
+  STATE.records=result.records; STATE.duplicateCount=result.removed;
+  text('dedupeInfo', `現在 ${nf.format(STATE.duplicateCount)} 行を重複として除外中。※ 同じ投稿URL＋同じ楽曲・アーティストの組合せだけを除外します。URLのない行は除外しません。`);
+  if (shouldRender) render();
+}
+function updatePeriodButtons() {
+  document.querySelectorAll('[data-period]').forEach(btn => {const on=btn.dataset.period===STATE.period;btn.classList.toggle('active',on);btn.setAttribute('aria-pressed',String(on));});
+  const p=periodFor(STATE.period,todayJST());
+  text('periodLabel', p.mode==='all' ? '全期間を集計' : `${p.start} 〜 ${p.end}`);
+  text('trendHelp',p.mode==='all' ? '直近7日・30日を選ぶと順位の変動を表示' : `前の${STATE.period}日間（${p.prevStart} 〜 ${p.prevEnd}）と比較`);
+}
+function setPeriod(value) {STATE.period=value;STATE.page=0;$('startDate').value='';$('endDate').value='';updatePeriodButtons();render();}
+function renderAliasList() {
+  const target=$('aliasList');clear(target);
+  const entries=Object.entries(STATE.localAliases).flatMap(([type, map])=>Object.entries(map).map(([from,to])=>({type,from,to})));
+  text('aliasCount',`このブラウザで登録：${nf.format(entries.length)} 件 ／ 全体共通：${Object.values(STATE.globalAliases).reduce((n,m)=>n+Object.keys(m).length,0)} 件`);
+  if (!entries.length) {target.append(elt('span','subtle','まだブラウザ固有の統合ルールはありません。'));return;}
+  for (const entry of entries) {
+    const row=elt('div','alias-entry');
+    row.append(elt('span','alias-type',({songs:'楽曲',artists:'アーティスト',users:'ユーザー'})[entry.type]));
+    row.append(elt('span','alias-from',entry.from));row.append(elt('span','alias-arrow','→'));row.append(elt('strong','alias-to',entry.to));
+    const remove=elt('button','alias-remove','削除');remove.type='button';remove.addEventListener('click',()=>{
+      delete STATE.localAliases[entry.type][entry.from];saveAliasesAndRender();
+    });row.append(remove);target.append(row);
+  }
+}
+function saveAliasesAndRender() {STATE.localAliases=cleanAliases(STATE.localAliases); storageSet('voca-v3-aliases',STATE.localAliases);refreshAliasState();renderAliasList();rebuildRecords();}
+
 
 function restoreMapping(guessed) {
   if (STATE.source !== 'sheet') return guessed;
@@ -69,7 +113,7 @@ function updateMappingUI() {
 }
 function applyMapping(next) {
   STATE.mapping = next;
-  STATE.records = createRecords(STATE.data, STATE.mapping);
+  rebuildRecords(false);
   STATE.focus = null;
   STATE.page = 0;
   STATE.showAll = {songs:false, artists:false, users:false};
@@ -94,17 +138,18 @@ function useData(csv, source, label) {
   updateMappingUI();
   applyMapping(mapping);
   const missing = ['song','artist','user','date'].filter(field => mapping[field] < 0);
-  status(`${label}：${nf.format(parsed.data.length)}行・${parsed.headers.length}列を読み込みました。` + (missing.length ? ' 「列の設定」を確認してください。' : ''), source === 'demo' ? 'demo' : 'success');
+  status(`${label}：${nf.format(parsed.data.length)}行・${parsed.headers.length}列を読み込みました。` + (STATE.duplicateCount ? ` 重複 ${STATE.duplicateCount}行を除外。` : '') + (missing.length ? ' 「列の設定」を確認してください。' : ''), source === 'demo' ? 'demo' : 'success');
 }
-async function loadRemote() {
+async function loadRemote(manual = false) {
   const gid = $('gidInput').value.trim() || '0';
   if (!/^\d{1,20}$/.test(gid)) { status('gidは数字のみで指定してください。', 'error'); return; }
   if (STATE.loading) return;
-  STATE.loading = true;
+  STATE.loading = true; STATE.lastAttemptAt=Date.now();
+  storageSet('voca-v3-gid',gid);
   $('refreshBtn').disabled = true;
   status('Googleスプレッドシートからデータを取得しています…');
   try {
-    const response = await fetch(`/api/sheet?gid=${encodeURIComponent(gid)}&refresh=1`, {cache:'no-store'});
+    const response = await fetch(`/api/sheet?gid=${encodeURIComponent(gid)}${manual ? '&refresh=1' : ''}`, {cache:'no-store'});
     if (!response.ok) {
       let detail = `HTTP ${response.status}`;
       try { detail = (await response.json()).error || detail; } catch {}
@@ -112,13 +157,26 @@ async function loadRemote() {
     }
     const body = await response.text();
     if (body.length > MAX_CSV_SIZE * 2) throw new Error('データが大きすぎます。5MB未満のCSVを使用してください。');
-    useData(body, 'sheet', 'Google Sheets');
+    if (STATE.source === 'sheet' && STATE.lastCSV === body && STATE.lastGid === gid) {
+      status('Google Sheetsを確認しました。前回から変更はありません。','success');
+    } else if (STATE.source === 'sheet' && STATE.lastGid === gid) {
+      const parsed=parseSheetCSV(body);
+      if (JSON.stringify(parsed.headers) === JSON.stringify(STATE.headers)) {
+        STATE.data=parsed.data;rebuildRecords();
+        status(`Google Sheetsの更新を反映しました。${nf.format(parsed.data.length)}行を読み込み、重複${STATE.duplicateCount}行を除外しています。`,'success');
+      } else useData(body, 'sheet', 'Google Sheets');
+    } else {
+      useData(body, 'sheet', 'Google Sheets');
+    }
+    STATE.lastCSV=body; STATE.lastGid=gid; STATE.lastFetchedAt=Date.now();
+    text('lastUpdated',`最終更新：${readableTime(STATE.lastFetchedAt)}（日本時間）`);
   } catch (e) {
     status(`シートを取得できませんでした：${e.message} サンプル表示かCSV読み込みでも動作確認できます。`, 'error');
   } finally { STATE.loading = false; $('refreshBtn').disabled = false; }
 }
 
 function resetFilters() {
+  STATE.period='all';updatePeriodButtons();
   $('searchInput').value = '';
   $('startDate').value = '';
   $('endDate').value = '';
@@ -127,16 +185,18 @@ function resetFilters() {
   render();
 }
 function render() {
+  const p=periodFor(STATE.period,todayJST());
   STATE.filtered = filterRecords(STATE.records, {
-    query: $('searchInput').value, start: $('startDate').value, end: $('endDate').value, focus: STATE.focus
+    query: $('searchInput').value, start: p.start || $('startDate').value, end: p.end || $('endDate').value, focus: STATE.focus
   });
+  STATE.trend=computeTrends(STATE.records,{mode:STATE.period,today:todayJST(),query:$('searchInput').value,focus:STATE.focus});
   STATE.analysis = aggregateAll(STATE.filtered);
   const a = STATE.analysis;
   text('countAll', nf.format(a.rowCount));
   text('countSongs', nf.format(a.songs.length));
   text('countArtists', nf.format(a.artists.length));
   text('countUsers', nf.format(a.users.length));
-  updateFocus();
+  updateFocus(); renderFreshTracks();
   for (const kind of ['songs', 'artists', 'users']) renderRanking(kind);
   renderMonths();
   renderPosts();
@@ -152,6 +212,24 @@ function updateFocus() {
     chip.append(b);
   }
 }
+function makeArtwork(record) {
+  const box=elt('span','rank-art');
+  const raw=record?.cover;const src=safeHttpUrl(raw);
+  if (src && src.startsWith('https://')) {
+    const img=elt('img');img.src=src;img.alt='';img.loading='lazy';img.referrerPolicy='no-referrer';img.onerror=()=>{box.replaceChildren(elt('span','', '♫'));};box.append(img);
+  } else box.append(elt('span','','♫'));
+  return box;
+}
+function renderFreshTracks() {
+  const sec=$('freshTracks'),target=$('freshItems');clear(target);
+  if (STATE.period==='all') {sec.hidden=true;return;}
+  const list=STATE.analysis.songs.filter(g=>STATE.trend.songs.get(g.key)?.isNew).slice(0,7);
+  sec.hidden = !list.length;
+  list.forEach(g=>{const button=elt('button','fresh-card');button.type='button';
+    button.append(elt('span','fresh-symbol','✦'),elt('strong','',g.label),elt('small','',g.detail+' ・ '+g.count+' 件'));
+    button.addEventListener('click',()=>{STATE.focus={field:'song',key:g.key,label:g.label+' / '+g.detail};STATE.page=0;render();$('posts').scrollIntoView({behavior:'smooth',block:'start'});});target.append(button);
+  });
+}
 function renderRanking(kind) {
   const groups = STATE.analysis[kind];
   const target = $({songs:'songRanking', artists:'artistRanking', users:'userRanking'}[kind]);
@@ -165,14 +243,23 @@ function renderRanking(kind) {
     button.title = `${g.label} の投稿に絞り込み`;
     button.setAttribute('aria-label',`${g.rank}位 ${g.label} ${g.count}件。クリックで絞り込み`);
     const place = elt('span', 'rank-place' + (g.rank <= 3 ? ' rank-' + g.rank : ''), String(g.rank).padStart(2,'0'));
+    const sample=STATE.filtered.find(r=>(kind==='songs'?r.songKey:kind==='artists'?r.artistKey:r.userKey)===g.key && r.cover);
+    if (kind==='songs') {button.classList.add('has-art');button.append(makeArtwork(sample));}
     const middle = elt('span','rank-main');
     middle.append(elt('span','rank-name',g.label));
     const explanation = kind === 'songs' ? (g.detail || 'アーティスト未登録') : kind === 'users' ? `${nf.format(g.uniqueSongs)}曲をリクエスト` : `${nf.format(g.uniqueSongs)}曲にリクエスト`;
     middle.append(elt('span','rank-sub',explanation));
+    const movement=STATE.trend?.[kind]?.get(g.key);
+    if (STATE.period!=='all' && movement) {
+      const tag = movement.isNew ? 'NEW' : movement.isReturning ? '再登場' : movement.change == null ? '前期なし' : movement.change > 0 ? `↑ ${movement.change}` : movement.change < 0 ? `↓ ${Math.abs(movement.change)}` : '→ 同順位';
+      const span=elt('span','rank-movement '+(movement.isNew?'is-new':movement.change>0?'is-up':movement.change<0?'is-down':'is-flat'),tag);
+      middle.append(span);
+    }
     const track = elt('span','rank-track');
     const fill = elt('span','rank-bar'); fill.style.width = Math.max(2,(g.count / max) * 100) + '%'; track.append(fill);
     const count = elt('span','rank-count'); count.append(elt('strong','',nf.format(g.count)),elt('small','','件'));
     button.append(place,middle,track,count);
+    if (g.rank<=3) button.classList.add('top-rank','top-'+g.rank);
     button.addEventListener('click', () => {
       STATE.focus = {field: RANK_FIELDS[kind], key: g.key, label: `${g.label}${kind === 'songs' ? ' / ' + g.detail : ''}`};
       STATE.page = 0; render(); $('posts').scrollIntoView({behavior:'smooth',block:'start'});
@@ -250,9 +337,9 @@ function download(kind) {
   if (!STATE.records.length) { status('データ読み込み後にCSVを保存できます。','error'); return; }
   const a = STATE.analysis;
   const out = {
-    songs: [['順位','曲名','アーティスト','リクエスト件数','ユニーク投稿者数'],...a.songs.map(g=>[g.rank,g.label,g.detail,g.count,g.uniqueUsers])],
-    artists: [['順位','アーティスト','リクエスト件数','楽曲数'],...a.artists.map(g=>[g.rank,g.label,g.count,g.uniqueSongs])],
-    users: [['順位','ユーザー','リクエスト件数','リクエストした楽曲数'],...a.users.map(g=>[g.rank,g.label,g.count,g.uniqueSongs])],
+    songs: [['順位','曲名','アーティスト','リクエスト件数','ユニーク投稿者数','順位変動'],...a.songs.map(g=>[g.rank,g.label,g.detail,g.count,g.uniqueUsers,STATE.period==='all'?'':(STATE.trend.songs.get(g.key)?.isNew ? 'NEW' : STATE.trend.songs.get(g.key)?.change ?? '')])],
+    artists: [['順位','アーティスト','リクエスト件数','楽曲数','順位変動'],...a.artists.map(g=>[g.rank,g.label,g.count,g.uniqueSongs,STATE.period==='all'?'':STATE.trend.artists.get(g.key)?.change ?? ''])],
+    users: [['順位','ユーザー','リクエスト件数','リクエストした楽曲数','順位変動'],...a.users.map(g=>[g.rank,g.label,g.count,g.uniqueSongs,STATE.period==='all'?'':STATE.trend.users.get(g.key)?.change ?? ''])],
     months: [['月','リクエスト件数'],...a.months.map(v=>[v.month,v.count])],
     records: [['投稿日','楽曲名','アーティスト名','ユーザー名','投稿URL'],...STATE.filtered.map(r=>[r.rawDate,r.song,r.artist,r.user,r.url])]
   }[kind];
@@ -263,12 +350,17 @@ function download(kind) {
   document.body.append(anchor); anchor.click(); anchor.remove(); setTimeout(()=>URL.revokeObjectURL(objectUrl),1000);
 }
 
-function setup() {
+async function setup() {
+  STATE.dedupe=storageGet('voca-v3-dedupe',true)!==false; $('dedupeToggle').checked=STATE.dedupe;
+  $('autoRefresh').checked=storageGet('voca-v3-autorefresh',true)!==false;
+  await loadGlobalAliases();
+  updatePeriodButtons();
   const query = new URLSearchParams(location.search);
   const gid = query.get('gid');
   if (gid && /^\d{1,20}$/.test(gid)) $('gidInput').value = gid;
-  $('refreshBtn').addEventListener('click',loadRemote);
-  $('gidInput').addEventListener('keydown',e=>{if(e.key === 'Enter') loadRemote();});
+  else {const savedGid=storageGet('voca-v3-gid','0'); if(/^\d{1,20}$/.test(String(savedGid))) $('gidInput').value = String(savedGid);}
+  $('refreshBtn').addEventListener('click',()=>loadRemote(true));
+  $('gidInput').addEventListener('keydown',e=>{if(e.key === 'Enter') loadRemote(true);});
   $('demoBtn').addEventListener('click',()=>{try { useData(DEMO,'demo','架空のサンプルデータ'); } catch(e) {status(e.message,'error');}});
   $('csvFile').addEventListener('change',async e=>{
     const file = e.target.files?.[0]; if (!file) return;
@@ -286,7 +378,16 @@ function setup() {
     applyMapping(mapping); updateMappingUI(); $('mappingDetails').open = false;
     status('列の設定を更新して再集計しました。','success');
   });
-  for (const id of ['searchInput','startDate','endDate']) $(id).addEventListener('input',()=>{STATE.page=0;render();});
+  for (const id of ['searchInput','startDate','endDate']) $(id).addEventListener('input',()=>{if(id!=='searchInput') {STATE.period='all';updatePeriodButtons();}STATE.page=0;render();});
+  document.querySelectorAll('[data-period]').forEach(b=>b.addEventListener('click',()=>setPeriod(b.dataset.period)));
+  $('dedupeToggle').addEventListener('change',e=>{STATE.dedupe=e.target.checked;storageSet('voca-v3-dedupe',STATE.dedupe);rebuildRecords();});
+  $('aliasForm').addEventListener('submit',e=>{e.preventDefault();const type=$('aliasKind').value;const from=$('aliasFrom').value.trim(),to=$('aliasTo').value.trim();if(!from||!to)return;const key=type==='users'?userKey(from):normalizeName(from);if(!key) return;STATE.localAliases[type][key]=to;saveAliasesAndRender();$('aliasFrom').value='';$('aliasTo').value='';status('表記の統合ルールを保存しました。このブラウザ内で集計に反映しました。','success');});
+  $('clearAliases').addEventListener('click',()=>{if(!confirm('このブラウザの統合ルールをすべて削除しますか？'))return;STATE.localAliases={songs:{},artists:{},users:{}};saveAliasesAndRender();});
+  $('exportAliases').addEventListener('click',()=>{const out=combinedAliases(STATE.globalAliases, STATE.localAliases);const blob=new Blob([JSON.stringify(out,null,2)+'\n'],{type:'application/json'});const url=URL.createObjectURL(blob);const a=elt('a');a.href=url;a.download='aliases.json';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);});
+  $('autoRefresh').addEventListener('change',e=>{storageSet('voca-v3-autorefresh',e.target.checked);});
+  const autoCheck=()=>{if(!$('autoRefresh').checked||STATE.source!=='sheet'||document.visibilityState==='hidden'||STATE.loading)return;if(Date.now()-STATE.lastAttemptAt>=5*60*1000) loadRemote(false);};
+  setInterval(autoCheck,60*1000);document.addEventListener('visibilitychange',autoCheck);window.addEventListener('focus',autoCheck);
+  $('shareBtn').addEventListener('click',()=>{const message=`#ボカオバリクエスト 人気曲ランキングをチェック！\n${location.origin}${location.pathname}\n#ボカロ`;window.open('https://twitter.com/intent/tweet?text='+encodeURIComponent(message),'_blank','noopener,noreferrer');});
   $('resetBtn').addEventListener('click',resetFilters);
   for (const kind of ['Songs','Artists','Users']) {
     const k = kind.toLowerCase();
@@ -296,6 +397,6 @@ function setup() {
   $('prevBtn').addEventListener('click',()=>{STATE.page--;renderPosts();});
   $('nextBtn').addEventListener('click',()=>{STATE.page++;renderPosts();});
   render();
-  if (query.get('demo')==='1') $('demoBtn').click(); else loadRemote();
+  if (query.get('demo')==='1') $('demoBtn').click(); else loadRemote(false);
 }
 setup();

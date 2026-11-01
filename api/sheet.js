@@ -25,7 +25,7 @@ export default async function handler(req, res) {
     if (Buffer.byteLength(body,'utf8') > MAX_BYTES) return res.status(413).json({error:'CSVは5MB以下にしてください。'});
     res.setHeader('Content-Type','text/csv; charset=utf-8');
     res.setHeader('X-Content-Type-Options','nosniff');
-    res.setHeader('Cache-Control',req.query?.refresh ? 'no-store' : 'public, s-maxage=300, stale-while-revalidate=600');
+    res.setHeader('Cache-Control',req.query?.refresh ? 'no-store' : 'public, max-age=0, s-maxage=60, stale-while-revalidate=60');
     return res.status(200).send(body);
   } catch (error) {
     res.setHeader('Cache-Control','no-store');

@@ -22,7 +22,7 @@ test('date parser handles JST, Japanese dates, invalid dates, spreadsheet number
 test('guesses columns and aggregates by song+artist, artist, user and month', () => {
   const parsed = parseSheetCSV(csv);
   const mapping = guessMapping(parsed.headers, parsed.data);
-  assert.deepEqual(mapping, {song: 0, artist: 1, user: 2, date: 3, url: 4});
+  assert.deepEqual(mapping, {song: 0, artist: 1, user: 2, date: 3, url: 4, cover: -1});
   const records = createRecords(parsed.data, mapping);
   const a = aggregateAll(records);
   assert.equal(a.rowCount, 5);
