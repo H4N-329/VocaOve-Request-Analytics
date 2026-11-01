@@ -844,3 +844,62 @@ h1 {
   .song-video-meta {font-size:10px;gap:6px;line-height:1.7}
   .video-link-note {font-size:11px;margin:0 0 12px}
 }
+
+/* v3.6 — VocaDB video candidates and confirmed link management */
+.song-cell .song-video-find,
+.song-video-meta .video-find-btn {
+  border:0;background:none;display:inline;padding:0;text-align:left;color:#167c92;
+  font-weight:850;text-decoration:underline;text-decoration-color:rgba(16,187,203,.55);
+  text-underline-offset:3px;cursor:pointer;
+}
+.song-cell .song-video-find {font-size:inherit;line-height:1.5;color:#17253d}
+.song-cell .song-video-find:hover, .song-video-meta .video-find-btn:hover {color:#bc2c94}
+.song-video-meta .video-find-btn {font-size:11px}
+.video-dialog {width:min(760px,calc(100vw - 22px));max-height:min(88vh,980px);padding:0;border:2px solid #5fdde5;border-radius:20px;box-shadow:0 30px 90px rgba(7,35,55,.35);background:#fbfdff;color:#17283f}
+.video-dialog::backdrop {background:rgba(13,26,45,.67);backdrop-filter:blur(3px)}
+.video-dialog-inner {padding:24px;max-height:86vh;overflow-y:auto;overscroll-behavior:contain}
+.video-dialog-head {display:flex;align-items:flex-start;justify-content:space-between;gap:14px;border-bottom:1px solid #d7edf0;padding-bottom:14px}
+.video-dialog-head h2 {font-size:clamp(20px,3.3vw,28px);line-height:1.3;margin:6px 0 2px;overflow-wrap:anywhere}
+.video-dialog-head p {color:#60728a;font-size:13px;overflow-wrap:anywhere}
+.video-dialog-close {border:1px solid #bde8ed;background:white;color:#253f5c;width:38px;height:38px;flex-shrink:0;font-size:24px;border-radius:10px}
+.video-accuracy-warning {margin:15px 0;color:#634773;background:#fff4fb;border-left:4px solid #ff37b7;padding:11px 13px;font-size:12px;line-height:1.7}
+.video-candidate-status {font-size:12px;color:#47647c;margin:14px 0}
+.video-candidate-list {display:grid;gap:12px}
+.video-candidate {background:#fff;border:1px solid #bfe8ed;border-radius:12px;padding:14px;min-width:0}
+.video-candidate-heading {display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.video-candidate-about {display:grid;gap:2px;min-width:0}
+.video-candidate-song {font-size:16px;font-weight:850;overflow-wrap:anywhere}
+.video-candidate-artist {font-size:12px;color:#687791}
+.video-match-badge {font-size:10px;font-weight:800;border-radius:99px;background:#eaf9fa;color:#096d79;padding:5px 9px;max-width:100%}
+.video-candidate-vocadb {display:inline-block;font-size:11px;color:#227590;margin:8px 0 5px;text-decoration:underline;text-underline-offset:2px}
+.video-candidate-pv {display:flex;justify-content:space-between;align-items:center;gap:14px;border-top:1px solid #d5ebf0;padding:10px 0}
+.video-pv-desc {display:grid;min-width:0;gap:2px;overflow-wrap:anywhere;color:#53627a;font-size:11px;line-height:1.55}
+.video-pv-desc strong {color:#1c3651;font-size:12px}
+.video-pv-actions {display:flex;align-items:center;gap:8px;flex-shrink:0}
+.video-preview-btn,.video-choose-btn {font-size:11px;font-weight:800;padding:8px 12px;border-radius:8px;white-space:nowrap}
+.video-preview-btn {border:1px solid #7dcbd5;background:#fff;color:#147e90}
+.video-choose-btn {background:#00bccc;border:1px solid #00bccc;color:white}
+.video-choose-btn:hover {background:#098c9c}
+.video-no-results {padding:15px;background:#f0f9fb;color:#4c6b84;font-size:13px;border-radius:10px}
+.video-dialog-foot {display:flex;align-items:center;justify-content:space-between;gap:12px;border-top:1px solid #d7eaf0;margin-top:17px;padding-top:17px}
+.video-dialog-foot>div {display:flex;gap:16px;flex-wrap:wrap}
+.video-dialog-foot a {color:#a82983;text-decoration:underline;text-underline-offset:3px;font-size:12px;font-weight:800}
+.video-dialog-foot .btn {color:#203953;background:#f5fbfe}
+.video-link-export {display:flex;align-items:center;justify-content:space-between;gap:20px;margin:16px 0 20px;padding:20px 23px}
+.video-link-export h3 {font-size:17px;color:#17253d;margin:4px 0}
+.video-link-export p {font-size:12px;max-width:660px;color:#60728a}
+.video-link-export code {background:#e2f9fa;color:#096c78;padding:1px 4px;border-radius:4px}
+#confirmedVideoCount {display:block;color:#238091;font-size:11px;font-weight:800;margin-top:8px}
+.video-link-export-actions {display:grid;justify-items:end;gap:9px;flex-shrink:0}
+@media(max-width:720px) {
+  .video-dialog-inner {padding:15px}
+  .video-dialog-head h2 {font-size:20px}
+  .video-dialog-foot {align-items:stretch;flex-direction:column}
+  .video-dialog-foot .btn {align-self:flex-end}
+  .video-candidate {padding:11px}
+  .video-candidate-pv {align-items:stretch;flex-direction:column;gap:8px}
+  .video-pv-actions {justify-content:flex-start}
+  .video-preview-btn,.video-choose-btn {min-height:42px;display:inline-flex;align-items:center}
+  .video-link-export {align-items:stretch;flex-direction:column;padding:16px 13px}
+  .video-link-export-actions {display:flex;flex-wrap:wrap;justify-content:flex-start}
+}

@@ -2,6 +2,7 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
   "functions": {
-    "api/sheet.js": { "maxDuration": 30 }
+    "api/sheet.js": { "maxDuration": 30 },
+    "api/vocadb.js": { "maxDuration": 15 }
   }
 }

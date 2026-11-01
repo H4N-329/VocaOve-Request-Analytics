@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="description" content="#ボカオバリクエスト のリクエスト楽曲、アーティスト、投稿者ランキングと月別投稿分布を可視化">
   <meta name="theme-color" content="#f5fbfd">
-  <title>ボカオバリクエスト | ランキング・投稿分析 v3.5</title>
+  <title>ボカオバリクエスト | ランキング・投稿分析 v3.6</title>
   <link rel="stylesheet" href="/styles.css">
   <script type="module" src="/app.js"></script>
 </head>
@@ -14,7 +14,7 @@
     <div class="header-inner">
       <a class="brand" href="#top" aria-label="ボカオバリクエスト 分析トップ">
         <span class="brand-mark" aria-hidden="true">♬</span>
-        <span class="brand-text">VOCALOID <strong>REQUESTS</strong><small>ボカオバリクエスト分析 <b class="version-pill">v3.5</b></small></span>
+        <span class="brand-text">VOCALOID <strong>REQUESTS</strong><small>ボカオバリクエスト分析 <b class="version-pill">v3.6</b></small></span>
       </a>
       <nav class="main-nav" aria-label="ページ内メニュー"><a href="#songs">楽曲</a><a href="#artists">アーティスト</a><a href="#months">月別分布</a><a href="#users">投稿者</a><a href="#settings">データ設定</a></nav>
       <button class="source-link share-top" id="shareBtn" type="button">✦ Xで共有</button><a class="source-link sheet-top" href="https://docs.google.com/spreadsheets/d/10R20NZZYk4FzQ29HN8NcCr7oeSxUcceFKzdMpp9AkUU/edit" target="_blank" rel="noopener noreferrer">元データ ↗</a>
@@ -24,7 +24,7 @@
     <section class="hero">
       <div class="hero-main">
         <div class="eyebrow"><span class="signal-dot"></span> VOCALOID REQUEST ANALYTICS</div>
-        <h1><span class="gradient-text">#ボカオバリクエスト</span><br>リクエスト分析 <small class="hero-version">v3.5</small></h1>
+        <h1><span class="gradient-text">#ボカオバリクエスト</span><br>リクエスト分析 <small class="hero-version">v3.6</small></h1>
         <p>みんなのリクエストから、次に盛り上がる一曲を見つけよう。投稿傾向・人気曲・急上昇をリアルタイムにチェック。</p>
         <div class="hero-tags"><span>♬ 楽曲ランキング</span><span>✧ アーティスト</span><span>▤ 月別分布</span><span>♡ 投稿者</span><span>↗ トレンド比較</span></div>
         <a href="#settings" class="settings-jump">⚙ データ設定・更新はページ下部 ↓</a>
@@ -81,11 +81,20 @@
     </section>
 
     <section class="panel posts-panel" id="posts" aria-labelledby="postsTitle">
-      <div class="panel-heading"><div class="heading-group"><div class="section-micro">ORIGINAL POSTS</div><h2 id="postsTitle">投稿データ一覧</h2><p>楽曲名から動画へ移動できます。動画URL未登録の場合は検索結果を表示します。</p></div><button class="export-btn" type="button" data-export="records">↓ CSV</button></div>
-      <p class="video-link-note">🎵 <strong>曲名クリック：</strong>動画URL登録済みなら動画を直接表示。未登録ならYouTubeの検索結果を開きます（ニコニコ検索も利用できます）。</p>
+      <div class="panel-heading"><div class="heading-group"><div class="section-micro">ORIGINAL POSTS</div><h2 id="postsTitle">投稿データ一覧</h2><p>楽曲名から動画へ移動できます。未登録の楽曲はVocaDBの動画候補を探せます。</p></div><button class="export-btn" type="button" data-export="records">↓ CSV</button></div>
+      <p class="video-link-note">🎵 <strong>曲名クリック：</strong>動画URL登録済みなら動画を開きます。未登録ならVocaDBから候補を自動検索。候補の確認後にリンクを確定できます。</p>
       <div class="table-scroll"><table class="records-table"><thead><tr><th>投稿日</th><th>楽曲</th><th>アーティスト</th><th>投稿ユーザー</th><th>投稿リンク</th></tr></thead><tbody id="postsBody"></tbody></table></div>
       <div class="table-footer"><span id="postCount">—</span><div class="pager"><button id="prevBtn" type="button" aria-label="前のページ">←</button><span id="pageLabel">—</span><button id="nextBtn" type="button" aria-label="次のページ">→</button></div></div>
     </section>
+    <dialog id="videoDialog" class="video-dialog" aria-labelledby="videoDialogTitle">
+      <div class="video-dialog-inner">
+        <div class="video-dialog-head"><div><span class="section-micro">VIDEO MATCH / VocaDB</span><h2 id="videoDialogTitle">楽曲の動画候補</h2><p id="videoDialogSub"></p></div><button type="button" id="videoDialogClose" class="video-dialog-close" aria-label="閉じる">×</button></div>
+        <p class="video-accuracy-warning">VocaDBのデータはユーザーによる登録情報です。<strong>検索候補は公式動画と保証されません。</strong> 投稿者・曲名・アレンジ違いを確認してから「この動画を採用」を押してください。</p>
+        <div id="videoCandidateStatus" class="video-candidate-status" role="status" aria-live="polite">候補を探しています…</div>
+        <div id="videoCandidateList" class="video-candidate-list"></div>
+        <div class="video-dialog-foot"><div><a id="videoYouTubeSearch" target="_blank" rel="noopener noreferrer">YouTubeで検索 ↗</a><a id="videoNicoSearch" target="_blank" rel="noopener noreferrer">ニコニコ動画で検索 ↗</a></div><button type="button" id="videoDialogDismiss" class="btn">閉じる</button></div>
+      </div>
+    </dialog>
     <section class="data-management" id="settings" aria-labelledby="settingsTitle">
       <div class="settings-heading">
         <div><span class="section-micro">DATA MANAGEMENT</span><h2 id="settingsTitle">データ管理・更新</h2><p>集計元の更新、列の確認、表記の統合はこちらから設定できます。</p></div>
@@ -135,8 +144,12 @@
     </details>
     </section>
 
+    <div class="video-link-export panel">
+      <div><span class="section-micro">VIDEO LINKS</span><h3>確定した動画リンク</h3><p>このブラウザで選んだ動画はローカル保存されます。全閲覧者で共有する場合はJSONをダウンロードし、GitHubのルートに <code>video-links.json</code> としてアップロードしてください。</p><span id="confirmedVideoCount">このブラウザでの確定：0件</span></div>
+      <div class="video-link-export-actions"><button type="button" id="exportVideoLinks" class="btn btn-primary">確定リンクをJSON保存</button><button type="button" id="resetLocalVideoLinks" class="text-btn">このブラウザの確定を解除</button></div>
+    </div>
     <div class="rules-note">集計基準：<strong>1行＝1リクエスト</strong>（重複除外ONの場合は同じ投稿URL・同じ楽曲を1件に統合）。表記ゆれは正規化＋登録済み統合ルールを適用。順位変動は選択した7日／30日とその直前の同期間を比較します。日付は日本時間を使用します。自動更新はページを開いている間のみ実行します。投稿ランキングでは初期状態でレギュラーDJ4名を除外しますが、その他の集計と投稿一覧には含まれます。</div>
-    <footer class="footer"><span>VOCALOID REQUESTS / #ボカオバリクエスト</span><span>v3.5 · Vercel + Google Sheets (read-only)</span></footer>
+    <footer class="footer"><span>VOCALOID REQUESTS / #ボカオバリクエスト</span><span>v3.6 · Vercel + Google Sheets (read-only)</span></footer>
   </main>
 </body>
 </html>

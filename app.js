@@ -2,6 +2,7 @@ import { FIELDS, parseSheetCSV, guessMapping, createRecords, filterRecords, aggr
 import { combinedAliases, cleanAliases, removeDuplicateRequests, periodFor, computeTrends, makeTrends } from './lib/v3.mjs';
 import { visibleUserRanking, ORGANIZER_NAMES } from './lib/organizers.mjs';
 import { songVideoLinks, inheritVideoUrls } from './lib/video.mjs';
+import { cleanVideoMap, chosenVideoFor } from './lib/vocadb.mjs';
 
 const $ = id => document.getElementById(id);
 const nf = new Intl.NumberFormat('ja-JP');
@@ -12,7 +13,8 @@ const STATE = {
   period: 'all', trend: null, aliases: {songs:{},artists:{},users:{}},
   globalAliases:{songs:{},artists:{},users:{}}, localAliases:{songs:{},artists:{},users:{}},
   dedupe: true, duplicateCount: 0, lastFetchedAt: 0, lastAttemptAt: 0,
-  lastCSV: null, lastGid: null, showOrganizers: false
+  lastCSV: null, lastGid: null, showOrganizers: false,
+  globalVideos:{}, localVideos:{}, videoCache:new Map(), activeVideoRecord:null, videoRequestId:0
 };
 const MAP_IDS = { song: 'mapSong', artist: 'mapArtist', user: 'mapUser', date: 'mapDate', url: 'mapUrl', cover: 'mapCover', video: 'mapVideo', youtube: 'mapYoutube', niconico: 'mapNiconico' };
 const RANK_FIELDS = { songs: 'song', artists: 'artist', users: 'user' };
@@ -52,6 +54,100 @@ async function loadGlobalAliases() {
   try { const response=await fetch('/aliases.json',{cache:'no-store'}); if(response.ok) STATE.globalAliases=cleanAliases(await response.json()); } catch {}
   STATE.localAliases=cleanAliases(storageGet('voca-v3-aliases',{})); refreshAliasState(); renderAliasList();
 }
+async function loadVideoLinks() {
+  try {
+    const res=await fetch('/video-links.json',{cache:'no-store'});
+    if(res.ok) STATE.globalVideos=cleanVideoMap(await res.json());
+  } catch { STATE.globalVideos={}; }
+  STATE.localVideos=cleanVideoMap(storageGet('voca-v3-confirmed-videos',{}));
+  updateVideoCount();
+}
+function updateVideoCount(){
+  text('confirmedVideoCount', `このブラウザでの確定：${nf.format(Object.keys(STATE.localVideos).length)}件 ／ 全体共通：${nf.format(Object.keys(STATE.globalVideos).length)}件`);
+}
+function saveVideoLinks() {
+  STATE.localVideos=cleanVideoMap(STATE.localVideos);
+  storageSet('voca-v3-confirmed-videos',STATE.localVideos);
+  updateVideoCount(); renderPosts();
+}
+function downloadVideoLinks() {
+  const combined=cleanVideoMap({...STATE.globalVideos,...STATE.localVideos});
+  const blob=new Blob([JSON.stringify(combined,null,2)+'\n'],{type:'application/json'});
+  const objectUrl=URL.createObjectURL(blob), a=elt('a');
+  a.href=objectUrl;a.download='video-links.json';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(objectUrl),1000);
+}
+function closeVideoDialog() { STATE.videoRequestId++; $('videoDialog').close(); STATE.activeVideoRecord=null; }
+function videoDialogLine(parent,tag,cls,content) {const e=elt(tag,cls,content);parent.append(e);return e;}
+function renderVideoCandidates(items, r) {
+  const target=$('videoCandidateList');clear(target);
+  let videosCount=0;
+  for (const item of items) {
+    const card=elt('article','video-candidate');
+    const heading=elt('div','video-candidate-heading');
+    const about=elt('div','video-candidate-about');
+    videoDialogLine(about,'strong','video-candidate-song',item.title || '名称未登録');
+    videoDialogLine(about,'span','video-candidate-artist',item.artist || 'アーティスト未登録');
+    const badge=elt('span','video-match-badge',item.confidence);badge.title='類似度の目安です。公式動画である証明にはなりません。';
+    heading.append(about,badge);card.append(heading);
+    const voca=elt('a','video-candidate-vocadb',`VocaDBの楽曲ページ ↗${item.songType ? ' ／ ' + item.songType : ''}`);
+    voca.href=item.url;voca.target='_blank';voca.rel='noopener noreferrer';card.append(voca);
+    for (const pv of item.videos) {
+      videosCount++;
+      const row=elt('div','video-candidate-pv');
+      const description=elt('div','video-pv-desc');
+      videoDialogLine(description,'strong','',`${pv.platform}${pv.type ? ` ／ ${pv.type}` : ''}`);
+      if (pv.title) videoDialogLine(description,'span','',pv.title);
+      if (pv.author) videoDialogLine(description,'span','',`投稿者：${pv.author}`);
+      const actions=elt('div','video-pv-actions');
+      const watch=elt('a','video-preview-btn','動画確認 ↗');watch.href=pv.url;watch.target='_blank';watch.rel='noopener noreferrer';
+      const choose=elt('button','video-choose-btn','この動画を採用');choose.type='button';
+      choose.addEventListener('click',()=>{
+        // Choose only a video that came from our sanitized API response.
+        STATE.localVideos[r.songKey]={url:pv.url,platform:pv.platform};
+        saveVideoLinks(); closeVideoDialog();
+        status(`「${r.song}」の動画を確定しました。ほかの同じ楽曲の投稿にも反映します。`, 'success');
+      });
+      actions.append(watch,choose);row.append(description,actions);card.append(row);
+    }
+    target.append(card);
+  }
+  if (!items.length || !videosCount) {
+    videoDialogLine(target,'p','video-no-results',items.length ? '該当する楽曲は見つかりましたが、YouTube・ニコニコ動画のURLは登録されていません。下の検索リンクから探してください。' : 'VocaDBに一致する候補が見つかりませんでした。下の検索リンクを利用してください。');
+  }
+  text('videoCandidateStatus',`${items.length}件の楽曲候補・${videosCount}件の動画候補を取得しました。採用前に動画を確認してください。`);
+}
+async function openVideoFinder(r) {
+  if (!r?.song?.trim()) return;
+  const dialog=$('videoDialog');
+  STATE.activeVideoRecord=r;
+  const seq=++STATE.videoRequestId;
+  text('videoDialogTitle',r.song);
+  text('videoDialogSub',r.artist || 'アーティスト未登録');
+  text('videoCandidateStatus','VocaDBから動画候補を探しています…');
+  clear($('videoCandidateList'));
+  const searches=songVideoLinks({...r,video:'',youtube:'',niconico:''});
+  $('videoYouTubeSearch').href=searches.main?.url || '#';
+  $('videoNicoSearch').href=searches.alternate?.url || '#';
+  if (!dialog.open) dialog.showModal();
+  const key=r.songKey;
+  try {
+    let items=STATE.videoCache.get(key);
+    if (!items) {
+      const response=await fetch('/api/vocadb?'+new URLSearchParams({song:r.song,artist:r.artist}),{cache:'default'});
+      if(!response.ok){let reason='候補検索に失敗しました。';try{reason=(await response.json()).error || reason;}catch{}throw Error(reason);}
+      const payload=await response.json();
+      items=Array.isArray(payload.candidates)?payload.candidates:[];
+      STATE.videoCache.set(key,items);
+    }
+    if (seq!==STATE.videoRequestId || !dialog.open) return;
+    renderVideoCandidates(items,r);
+  } catch(e) {
+    if (seq!==STATE.videoRequestId || !dialog.open) return;
+    text('videoCandidateStatus',e.message || '候補取得に失敗しました。');
+    videoDialogLine($('videoCandidateList'),'p','video-no-results','下のYouTube・ニコニコ検索リンクから探すこともできます。');
+  }
+}
+
 function rebuildRecords(shouldRender = true) {
   const raw=inheritVideoUrls(createRecords(STATE.data,STATE.mapping,STATE.aliases));
   const result=removeDuplicateRequests(raw,STATE.dedupe);
@@ -343,27 +439,26 @@ function renderPosts() {
   for (const r of visible) {
     const tr = elt('tr');
     const songTd = elt('td','song-cell');
-    const videoLinks = songVideoLinks(r);
-    if (videoLinks.main) {
-      const main = elt('a','song-video-link',r.song);
-      main.href = videoLinks.main.url;
-      main.target = '_blank';
-      main.rel = 'noopener noreferrer';
-      main.title = videoLinks.main.mode === 'direct' ? `${videoLinks.main.platform}の動画を開く` : 'YouTubeで曲名＋アーティスト名を検索（動画未登録）';
-      main.setAttribute('aria-label', `${r.song}：${main.title}`);
-      songTd.append(main);
-      const info = elt('div','song-video-meta');
-      info.append(elt('span', videoLinks.main.mode === 'direct' ? 'video-exact' : 'video-search',
-        videoLinks.main.mode === 'direct' ? `${videoLinks.main.platform} 動画 ↗` : 'YouTube検索結果 ↗'));
-      if (videoLinks.alternate) {
-        const alt = elt('a','video-nico-search','ニコニコ検索 ↗');
-        alt.href = videoLinks.alternate.url;
-        alt.target = '_blank'; alt.rel = 'noopener noreferrer';
-        alt.setAttribute('aria-label', `${r.song}をニコニコ動画で検索`);
-        info.append(alt);
+    const selected=chosenVideoFor(r,STATE.globalVideos,STATE.localVideos);
+    if (r.song?.trim()) {
+      if (selected) {
+        const link=elt('a','song-video-link',r.song);
+        link.href=selected.url;link.target='_blank';link.rel='noopener noreferrer';
+        link.title=`${selected.platform}の動画を開く`;
+        songTd.append(link);
+        const info=elt('div','song-video-meta');
+        info.append(elt('span','video-exact',`${selected.platform} 動画 ↗`));
+        const choose=elt('button','video-find-btn','候補を再検索');choose.type='button';
+        choose.addEventListener('click',()=>openVideoFinder(r));info.append(choose);songTd.append(info);
+      } else {
+        const button=elt('button','song-video-find',r.song);button.type='button';
+        button.title='VocaDBから動画候補を検索する';
+        button.addEventListener('click',()=>openVideoFinder(r));songTd.append(button);
+        const info=elt('div','song-video-meta');
+        const find=elt('button','video-find-btn','VocaDBで動画候補を探す ↗');find.type='button';
+        find.addEventListener('click',()=>openVideoFinder(r));info.append(find);songTd.append(info);
       }
-      songTd.append(info);
-    } else songTd.textContent = r.song || '—';
+    } else songTd.textContent='—';
     tr.append(elt('td','date-cell',r.rawDate || '—'),songTd,elt('td','',r.artist || '—'),elt('td','',r.user || '—'));
     const td = elt('td');
     const url = safeHttpUrl(r.url);
@@ -396,6 +491,7 @@ async function setup() {
   STATE.dedupe=storageGet('voca-v3-dedupe',true)!==false; $('dedupeToggle').checked=STATE.dedupe;
   $('autoRefresh').checked=storageGet('voca-v3-autorefresh',true)!==false;
   await loadGlobalAliases();
+  await loadVideoLinks();
   updatePeriodButtons();
   const query = new URLSearchParams(location.search);
   const gid = query.get('gid');
@@ -427,6 +523,11 @@ async function setup() {
   $('clearAliases').addEventListener('click',()=>{if(!confirm('このブラウザの統合ルールをすべて削除しますか？'))return;STATE.localAliases={songs:{},artists:{},users:{}};saveAliasesAndRender();});
   $('exportAliases').addEventListener('click',()=>{const out=combinedAliases(STATE.globalAliases, STATE.localAliases);const blob=new Blob([JSON.stringify(out,null,2)+'\n'],{type:'application/json'});const url=URL.createObjectURL(blob);const a=elt('a');a.href=url;a.download='aliases.json';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);});
   $('autoRefresh').addEventListener('change',e=>{storageSet('voca-v3-autorefresh',e.target.checked);});
+  $('videoDialogClose').addEventListener('click',closeVideoDialog);
+  $('videoDialogDismiss').addEventListener('click',closeVideoDialog);
+  $('videoDialog').addEventListener('close',()=>{STATE.videoRequestId++;STATE.activeVideoRecord=null;});
+  $('exportVideoLinks').addEventListener('click',downloadVideoLinks);
+  $('resetLocalVideoLinks').addEventListener('click',()=>{if(!confirm('このブラウザで確定した動画リンクをすべて解除しますか？'))return; STATE.localVideos={};saveVideoLinks();});
   $('toggleOrganizers').addEventListener('click',()=>{STATE.showOrganizers=!STATE.showOrganizers;STATE.showAll.users=false;render();});
   const autoCheck=()=>{if(!$('autoRefresh').checked||STATE.source!=='sheet'||document.visibilityState==='hidden'||STATE.loading)return;if(Date.now()-STATE.lastAttemptAt>=5*60*1000) loadRemote(false);};
   setInterval(autoCheck,60*1000);document.addEventListener('visibilitychange',autoCheck);window.addEventListener('focus',autoCheck);
