@@ -1,5 +1,6 @@
 import { FIELDS, parseSheetCSV, guessMapping, createRecords, filterRecords, aggregateAll, safeHttpUrl, csvExport, normalizeName, userKey } from './lib/analytics.mjs';
-import { combinedAliases, cleanAliases, removeDuplicateRequests, periodFor, computeTrends } from './lib/v3.mjs';
+import { combinedAliases, cleanAliases, removeDuplicateRequests, periodFor, computeTrends, makeTrends } from './lib/v3.mjs';
+import { visibleUserRanking, ORGANIZER_NAMES } from './lib/organizers.mjs';
 
 const $ = id => document.getElementById(id);
 const nf = new Intl.NumberFormat('ja-JP');
@@ -10,7 +11,7 @@ const STATE = {
   period: 'all', trend: null, aliases: {songs:{},artists:{},users:{}},
   globalAliases:{songs:{},artists:{},users:{}}, localAliases:{songs:{},artists:{},users:{}},
   dedupe: true, duplicateCount: 0, lastFetchedAt: 0, lastAttemptAt: 0,
-  lastCSV: null, lastGid: null
+  lastCSV: null, lastGid: null, showOrganizers: false
 };
 const MAP_IDS = { song: 'mapSong', artist: 'mapArtist', user: 'mapUser', date: 'mapDate', url: 'mapUrl', cover: 'mapCover' };
 const RANK_FIELDS = { songs: 'song', artists: 'artist', users: 'user' };
@@ -184,6 +185,22 @@ function resetFilters() {
   STATE.page = 0;
   render();
 }
+function updateOrganizerToggle() {
+  const btn=$('toggleOrganizers');
+  btn.setAttribute('aria-pressed',String(STATE.showOrganizers));
+  btn.textContent=STATE.showOrganizers ? '運営4名を非表示にする' : '運営4名を表示する';
+  text('organizerNote', STATE.showOrganizers
+    ? `運営4名（${ORGANIZER_NAMES.join('・')}）を含めて表示中`
+    : `運営4名（${ORGANIZER_NAMES.join('・')}）は除外中`);
+}
+function userRanking() { return visibleUserRanking(STATE.analysis?.users || [], STATE.showOrganizers); }
+function recalcUserTrend(p) {
+  if (p.mode==='all') return;
+  // 前期と当期で同じ表示条件に揃えてから順位変動を計算する。
+  const base=filterRecords(STATE.records,{query:$('searchInput').value,focus:STATE.focus});
+  const prev=aggregateAll(base.filter(r=>r.date && r.date>=p.prevStart && r.date<=p.prevEnd)).users;
+  STATE.trend.users=makeTrends(userRanking(),visibleUserRanking(prev,STATE.showOrganizers),base,p.start,'user');
+}
 function render() {
   const p=periodFor(STATE.period,todayJST());
   STATE.filtered = filterRecords(STATE.records, {
@@ -191,6 +208,8 @@ function render() {
   });
   STATE.trend=computeTrends(STATE.records,{mode:STATE.period,today:todayJST(),query:$('searchInput').value,focus:STATE.focus});
   STATE.analysis = aggregateAll(STATE.filtered);
+  recalcUserTrend(p);
+  updateOrganizerToggle();
   const a = STATE.analysis;
   text('countAll', nf.format(a.rowCount));
   text('countSongs', nf.format(a.songs.length));
@@ -231,7 +250,7 @@ function renderFreshTracks() {
   });
 }
 function renderRanking(kind) {
-  const groups = STATE.analysis[kind];
+  const groups = kind==='users' ? userRanking() : STATE.analysis[kind];
   const target = $({songs:'songRanking', artists:'artistRanking', users:'userRanking'}[kind]);
   const more = $({songs:'moreSongs',artists:'moreArtists',users:'moreUsers'}[kind]);
   clear(target);
@@ -296,16 +315,16 @@ function renderMonths() {
   };
   for (let i = 0; i <= 4; i++) {
     const value = Math.round((upper * i / 4) * 10) / 10, y = top + plotHeight * (1 - i / 4);
-    add('line',{x1:left, x2:width - 12, y1:y,y2:y,stroke:'#302b45','stroke-dasharray':'4 5'});
-    add('text',{x:left-12,y:y+4,'text-anchor':'end',fill:'#9790af','font-size':11}, nf.format(value));
+    add('line',{x1:left, x2:width - 12, y1:y,y2:y,stroke:'#d7edf1','stroke-dasharray':'4 5'});
+    add('text',{x:left-12,y:y+4,'text-anchor':'end',fill:'#596f88','font-size':11}, nf.format(value));
   }
   for (const [i, item] of a.months.entries()) {
     const barWidth = 38, x = left + 17 + i*per, barHeight = (item.count / upper)*plotHeight;
-    const rect = add('rect',{x,y:top+plotHeight-barHeight,width:barWidth,height:barHeight,rx:5,fill:item.count ? '#9a74ff' : '#504665'});
+    const rect = add('rect',{x,y:top+plotHeight-barHeight,width:barWidth,height:barHeight,rx:5,fill:item.count ? '#16bfcf' : '#e5f0f3'});
     const tip = document.createElementNS(NS,'title'); tip.textContent = `${formatMonth(item.month)}：${item.count}件`; rect.append(tip);
-    if (item.count) add('text',{x:x+barWidth/2,y:top+plotHeight-barHeight-9,'text-anchor':'middle',fill:'#e8ddff','font-size':12,'font-weight':700},String(item.count));
-    add('text',{x:x+barWidth/2,y:top+plotHeight+22,'text-anchor':'middle',fill:'#b9b4c9','font-size':11},item.month.slice(5)+'月');
-    add('text',{x:x+barWidth/2,y:top+plotHeight+37,'text-anchor':'middle',fill:'#77718d','font-size':10},item.month.slice(0,4));
+    if (item.count) add('text',{x:x+barWidth/2,y:top+plotHeight-barHeight-9,'text-anchor':'middle',fill:'#203b56','font-size':12,'font-weight':700},String(item.count));
+    add('text',{x:x+barWidth/2,y:top+plotHeight+22,'text-anchor':'middle',fill:'#435b77','font-size':11},item.month.slice(5)+'月');
+    add('text',{x:x+barWidth/2,y:top+plotHeight+37,'text-anchor':'middle',fill:'#708198','font-size':10},item.month.slice(0,4));
     const tr = elt('tr'); tr.append(elt('td','',formatMonth(item.month)),elt('td','',nf.format(item.count)+' 件')); table.append(tr);
   }
   chart.append(svg);
@@ -339,7 +358,7 @@ function download(kind) {
   const out = {
     songs: [['順位','曲名','アーティスト','リクエスト件数','ユニーク投稿者数','順位変動'],...a.songs.map(g=>[g.rank,g.label,g.detail,g.count,g.uniqueUsers,STATE.period==='all'?'':(STATE.trend.songs.get(g.key)?.isNew ? 'NEW' : STATE.trend.songs.get(g.key)?.change ?? '')])],
     artists: [['順位','アーティスト','リクエスト件数','楽曲数','順位変動'],...a.artists.map(g=>[g.rank,g.label,g.count,g.uniqueSongs,STATE.period==='all'?'':STATE.trend.artists.get(g.key)?.change ?? ''])],
-    users: [['順位','ユーザー','リクエスト件数','リクエストした楽曲数','順位変動'],...a.users.map(g=>[g.rank,g.label,g.count,g.uniqueSongs,STATE.period==='all'?'':STATE.trend.users.get(g.key)?.change ?? ''])],
+    users: [['順位','ユーザー','リクエスト件数','リクエストした楽曲数','順位変動'],...userRanking().map(g=>[g.rank,g.label,g.count,g.uniqueSongs,STATE.period==='all'?'':STATE.trend.users.get(g.key)?.change ?? ''])],
     months: [['月','リクエスト件数'],...a.months.map(v=>[v.month,v.count])],
     records: [['投稿日','楽曲名','アーティスト名','ユーザー名','投稿URL'],...STATE.filtered.map(r=>[r.rawDate,r.song,r.artist,r.user,r.url])]
   }[kind];
@@ -385,6 +404,7 @@ async function setup() {
   $('clearAliases').addEventListener('click',()=>{if(!confirm('このブラウザの統合ルールをすべて削除しますか？'))return;STATE.localAliases={songs:{},artists:{},users:{}};saveAliasesAndRender();});
   $('exportAliases').addEventListener('click',()=>{const out=combinedAliases(STATE.globalAliases, STATE.localAliases);const blob=new Blob([JSON.stringify(out,null,2)+'\n'],{type:'application/json'});const url=URL.createObjectURL(blob);const a=elt('a');a.href=url;a.download='aliases.json';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);});
   $('autoRefresh').addEventListener('change',e=>{storageSet('voca-v3-autorefresh',e.target.checked);});
+  $('toggleOrganizers').addEventListener('click',()=>{STATE.showOrganizers=!STATE.showOrganizers;STATE.showAll.users=false;render();});
   const autoCheck=()=>{if(!$('autoRefresh').checked||STATE.source!=='sheet'||document.visibilityState==='hidden'||STATE.loading)return;if(Date.now()-STATE.lastAttemptAt>=5*60*1000) loadRemote(false);};
   setInterval(autoCheck,60*1000);document.addEventListener('visibilitychange',autoCheck);window.addEventListener('focus',autoCheck);
   $('shareBtn').addEventListener('click',()=>{const message=`#ボカオバリクエスト 人気曲ランキングをチェック！\n${location.origin}${location.pathname}\n#ボカロ`;window.open('https://twitter.com/intent/tweet?text='+encodeURIComponent(message),'_blank','noopener,noreferrer');});

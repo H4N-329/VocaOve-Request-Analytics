@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="description" content="#ボカオバリクエスト のリクエスト楽曲、アーティスト、投稿者ランキングと月別投稿分布を可視化">
-  <meta name="theme-color" content="#efeff1">
-  <title>ボカオバリクエスト | ランキング・投稿分析 v3.1</title>
+  <meta name="theme-color" content="#f5fbfd">
+  <title>ボカオバリクエスト | ランキング・投稿分析 v3.2</title>
   <link rel="stylesheet" href="/styles.css">
   <script type="module" src="/app.js"></script>
 </head>
@@ -14,7 +14,7 @@
     <div class="header-inner">
       <a class="brand" href="#top" aria-label="ボカオバリクエスト 分析トップ">
         <span class="brand-mark" aria-hidden="true">♬</span>
-        <span class="brand-text">VOCALOID <strong>REQUESTS</strong><small>ボカオバリクエスト分析 <b class="version-pill">v3.1</b></small></span>
+        <span class="brand-text">VOCALOID <strong>REQUESTS</strong><small>ボカオバリクエスト分析 <b class="version-pill">v3.2</b></small></span>
       </a>
       <nav class="main-nav" aria-label="ページ内メニュー"><a href="#songs">楽曲</a><a href="#artists">アーティスト</a><a href="#months">月別分布</a><a href="#users">投稿者</a></nav>
       <button class="source-link share-top" id="shareBtn" type="button">✦ Xで共有</button><a class="source-link sheet-top" href="https://docs.google.com/spreadsheets/d/10R20NZZYk4FzQ29HN8NcCr7oeSxUcceFKzdMpp9AkUU/edit" target="_blank" rel="noopener noreferrer">元データ ↗</a>
@@ -24,7 +24,7 @@
     <section class="hero">
       <div class="hero-main">
         <div class="eyebrow"><span class="signal-dot"></span> VOCALOID REQUEST ANALYTICS</div>
-        <h1><span class="gradient-text">#ボカオバリクエスト</span><br>リクエスト分析 <small class="hero-version">v3.1</small></h1>
+        <h1><span class="gradient-text">#ボカオバリクエスト</span><br>リクエスト分析 <small class="hero-version">v3.2</small></h1>
         <p>みんなのリクエストから、次に盛り上がる一曲を見つけよう。投稿傾向・人気曲・急上昇をリアルタイムにチェック。</p>
         <div class="hero-tags"><span>♬ 楽曲ランキング</span><span>✧ アーティスト</span><span>▤ 月別分布</span><span>♡ 投稿者</span><span>↗ トレンド比較</span></div>
       </div>
@@ -110,6 +110,13 @@
 
     <section id="users" class="panel ranking-panel user-panel" aria-labelledby="userTitle">
       <div class="panel-heading"><div class="heading-group"><div class="section-micro">04 / TOP REQUESTERS</div><h2 id="userTitle">投稿ランキング</h2><p>リクエスト投稿が多いユーザーを表示</p></div><button class="export-btn" type="button" data-export="users">↓ CSV</button></div>
+      <div class="organizer-controls" aria-label="運営メンバーのランキング表示設定">
+        <div class="organizer-control-text">
+          <strong>運営メンバーの表示</strong>
+          <span id="organizerNote" aria-live="polite">運営4名を除外して表示しています</span>
+        </div>
+        <button id="toggleOrganizers" class="organizer-toggle" type="button" aria-pressed="false">運営4名を表示する</button>
+      </div>
       <div class="ranking-list user-ranking" id="userRanking"><div class="empty">読み込み中…</div></div>
       <button class="view-more" id="moreUsers" type="button" hidden>すべてのユーザーを表示 <span>⌄</span></button>
     </section>
@@ -119,8 +126,8 @@
       <div class="table-scroll"><table class="records-table"><thead><tr><th>投稿日</th><th>楽曲</th><th>アーティスト</th><th>投稿ユーザー</th><th>投稿リンク</th></tr></thead><tbody id="postsBody"></tbody></table></div>
       <div class="table-footer"><span id="postCount">—</span><div class="pager"><button id="prevBtn" type="button" aria-label="前のページ">←</button><span id="pageLabel">—</span><button id="nextBtn" type="button" aria-label="次のページ">→</button></div></div>
     </section>
-    <div class="rules-note">集計基準：<strong>1行＝1リクエスト</strong>（重複除外ONの場合は同じ投稿URL・同じ楽曲を1件に統合）。表記ゆれは正規化＋登録済み統合ルールを適用。順位変動は選択した7日／30日とその直前の同期間を比較します。日付は日本時間を使用します。自動更新はページを開いている間のみ実行します。</div>
-    <footer class="footer"><span>VOCALOID REQUESTS / #ボカオバリクエスト</span><span>v3.1 · Vercel + Google Sheets (read-only)</span></footer>
+    <div class="rules-note">集計基準：<strong>1行＝1リクエスト</strong>（重複除外ONの場合は同じ投稿URL・同じ楽曲を1件に統合）。表記ゆれは正規化＋登録済み統合ルールを適用。順位変動は選択した7日／30日とその直前の同期間を比較します。日付は日本時間を使用します。自動更新はページを開いている間のみ実行します。投稿ランキングでは初期状態で運営4名を除外しますが、その他の集計と投稿一覧には含まれます。</div>
+    <footer class="footer"><span>VOCALOID REQUESTS / #ボカオバリクエスト</span><span>v3.2 · Vercel + Google Sheets (read-only)</span></footer>
   </main>
 </body>
 </html>

@@ -248,7 +248,7 @@ body {background:radial-gradient(ellipse at 90% 0%,rgba(70,60,140,.26),transpare
 @media(max-width:400px){.period-btn {padding:7px 10px}.rank-item.has-art {grid-template-columns:20px 30px minmax(0,1fr) 39px 40px;gap:5px;padding:7px 4px}.rank-art {width:30px;height:30px}.rank-name {font-size:11px}.rank-count strong {font-size:13px}.rank-place {font-size:11px}.sync-settings {gap:9px}.alias-form {grid-template-columns:1fr}.alias-form button {grid-column:auto}}
 
 
-/* v3.1 — WINNER poster inspired theme */
+/* v3.1 — bright cyan / magenta event theme */
 :root {
   color-scheme: light;
   --bg:#efeff1;
@@ -312,33 +312,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible
   min-height:310px;
   padding:52px 8px 34px;
 }
-.hero::before {
-  content:"WINNER";
-  position:absolute;
-  left:0;
-  top:-10px;
-  font-size:clamp(88px, 19vw, 220px);
-  line-height:.82;
-  font-weight:1000;
-  letter-spacing:-.06em;
-  color:rgba(255,255,255,.82);
-  -webkit-text-stroke:4px #12c3d2;
-  z-index:0;
-  pointer-events:none;
-}
-.hero::after {
-  content:"VOCALOID ZONE";
-  position:absolute;
-  right:14px;
-  top:115px;
-  font-size:clamp(28px, 4.8vw, 70px);
-  line-height:1;
-  font-weight:1000;
-  letter-spacing:-.04em;
-  color:rgba(22,200,215,.92);
-  z-index:0;
-  pointer-events:none;
-}
+
+
 .hero-main {
   position:relative;
   z-index:1;
@@ -564,30 +539,229 @@ h1 {
 }
 @media (max-width:960px){
   .container {width:min(100% - 28px, 1240px)}
-  .hero::before {font-size:clamp(70px, 18vw, 180px); top:8px}
-  .hero::after {top:124px; right:0; font-size:clamp(24px, 5vw, 56px)}
+  
+  
 }
 @media (max-width:720px){
   body {background-size: 18px 18px, 18px 18px, auto}
   .hero {min-height:270px; padding-top:30px}
-  .hero::before {
-    top:0;
-    left:0;
-    font-size:clamp(66px, 26vw, 138px);
-    -webkit-text-stroke:2px #12c3d2;
-  }
-  .hero::after {
-    right:4px;
-    top:88px;
-    font-size:clamp(20px, 8vw, 40px);
-  }
+  
+  
   .hero-main {padding:18px 16px; background:rgba(255,255,255,.86)}
   .hero p {font-size:12px}
   .hero-decor {opacity:.5; right:-18px; top:120px; transform:scale(.7)}
 }
 @media (max-width:420px){
-  .hero::before {font-size:56px; top:6px}
-  .hero::after {top:72px; font-size:18px}
+  
+  
   .hero-tags {gap:6px}
   .hero-tags span {font-size:10px}
+}
+
+/* v3.2 — readable event colors / clean typography / mobile-first refinements */
+.hero::before, 
+.hero {min-height:265px;padding:37px 8px 28px}
+.hero-main {max-width:870px;padding:22px 26px;background:rgba(255,255,255,.91);border-color:rgba(21,192,207,.27)}
+.hero-decor {opacity:.40;right:9px;top:26px}
+.hero h1 {font-size:clamp(32px,4vw,54px);line-height:1.21;letter-spacing:-.045em}
+.hero p {font-size:14px;line-height:1.9;color:#41516b}
+.hero-tags span {padding:5px 11px;font-size:11px}
+.site-header .share-top {background:#fff;color:#0d8194}
+.source-alternates {border-top:1px solid #ccebf0;color:#5c6981}
+.source-note {color:#6b7790}
+.sheet-label {color:#2e776f}
+.gid-wrap {color:#364d64}
+.mapping-body>p,.aliases-body>p {border-color:#d9edf0;color:#4d6078}
+.aliases-body code {color:#0e8292}
+.alias-form label {color:#2b425a}
+.alias-toolbar {color:#53627c}
+.alias-from {color:#34455f}
+.alias-arrow {color:#6a7a94}
+.alias-to {color:#1d314b}
+.aliases-panel summary {color:#17283e}
+.fine-note {color:#5f7088!important}
+.period-buttons {flex-shrink:0}
+.period-caption small {font-size:11px}
+.filters-head h2,.heading-group h2 {letter-spacing:-.025em}
+.filters .filter-controls label,.mapping .mapping-fields label {color:#354961}
+.filter-controls input::placeholder {color:#70819b}
+.filter-controls input[type='date'] {color-scheme:light}
+.fresh-tracks h2 {font-size:18px}
+.fresh-tracks p {color:#4e617c}
+.fresh-card small {color:#65738a}
+.kpi-label {font-size:12px;color:#52627a}
+.kpi small {font-size:11px;color:#697990}
+.heading-group p {font-size:12px;line-height:1.65;color:#586a80}
+.heading-group h2 {font-size:22px}
+.rank-name {font-size:13px;line-height:1.45;color:#15263d}
+.rank-sub {font-size:11px;line-height:1.5;color:#586982}
+.rank-item {min-height:62px}
+.rank-item.top-1,.rank-item.top-2,.rank-item.top-3 {box-shadow:none}
+.rank-movement {font-size:10px}
+.rank-count small {color:#5f7087;font-size:10px}
+.small-heading {color:#62728b;font-size:12px}
+.empty {color:#64738a;font-size:13px}
+.month-detail {border-top:1px solid #d8edf1}
+.month-detail summary {color:#0d889b;font-size:12px}
+.scroll-hint {color:#64728c}
+.table-scroll th, th {background:#ecfafd;color:#125e70;font-size:12px;border-bottom:1px solid #d4edf2}
+.table-scroll td, td {background:rgba(255,255,255,.50);color:#31435c;font-size:12px;border-bottom:1px solid #e0edf1}
+.table-scroll td.song-cell, td.song-cell {color:#15263c;font-weight:800}
+.post-link {color:#ba258d}
+.post-link:hover {color:#9a1a77}
+.table-footer {color:#4f5e79}
+.footer {color:#50617a}
+.rules-note {font-size:12px;line-height:1.85}
+
+.organizer-controls {
+  position:relative;
+  display:flex;
+  flex-wrap:wrap;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin:0 0 18px;
+  padding:14px 16px;
+  background:linear-gradient(108deg,#f0fbfd,#fff);
+  border:1px solid #b9e7ed;
+  border-radius:12px;
+}
+.organizer-control-text {display:flex;flex-direction:column;gap:3px;min-width:0;flex:1}
+.organizer-control-text strong {font-size:13px;color:#1a3d56}
+.organizer-control-text span {font-size:11px;line-height:1.65;color:#53667e}
+.organizer-toggle {
+  flex-shrink:0;
+  padding:11px 15px;
+  min-height:42px;
+  background:#fff;
+  color:#0c879b;
+  border:2px solid #17b8cc;
+  border-radius:9px;
+  font-size:12px;
+  font-weight:800;
+  line-height:1.2;
+  transition:background .15s,border-color .15s;
+}
+.organizer-toggle:hover {background:#e8fafc}
+.organizer-toggle[aria-pressed="true"] {border-color:#ad5ad8;color:#722fa3;background:#faf3ff}
+.organizer-toggle[aria-pressed="true"]:hover {background:#f3e9ff}
+
+/* Mobile-only: comfortable reading, touch targets, no unintended lateral clipping */
+@media (max-width:720px) {
+  body {font-size:14px;line-height:1.7}
+  .container {width:calc(100% - 22px)}
+  .header-inner {height:64px;padding:0 12px;gap:8px}
+  .brand {gap:8px;min-width:0}
+  .brand-mark {width:34px;height:34px;border-radius:9px;font-size:21px}
+  .brand-text {font-size:12px;letter-spacing:.025em}
+  .brand-text small {font-size:10px;margin-top:3px}
+  .share-top {font-size:11px;padding:8px 10px}
+  .hero {min-height:auto;padding:22px 0 20px}
+  .hero-main {width:100%;padding:20px 17px;border-radius:12px}
+  .hero h1 {font-size:clamp(25px,6.75vw,37px);line-height:1.35;letter-spacing:-.035em;margin:9px 0}
+  .hero-version {font-size:11px;padding:2px 7px}
+  .hero p {font-size:13px;line-height:1.8}
+  .eyebrow {font-size:10px;letter-spacing:.13em}
+  .hero-tags {margin-top:14px;gap:7px}
+  .hero-tags span {font-size:11px;padding:5px 8px;border-width:1px}
+  .hero-decor {display:none}
+  .data-source,.filters {padding:17px 15px}
+  .source-topline {margin-bottom:8px}
+  .source-main h2 {font-size:17px}
+  .source-main p {font-size:12px;line-height:1.75}
+  .source-actions {display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:9px;margin-top:14px}
+  .gid-wrap {font-size:12px;min-width:0}
+  .gid-wrap input {width:100%;min-width:0;max-width:130px;height:44px}
+  .btn {min-height:44px;font-size:12px;padding:10px 12px}
+  .source-alternates {font-size:12px;gap:12px}
+  .source-note {font-size:11px}
+  .sync-settings {gap:8px;padding:10px}
+  .toggle-line {font-size:12px}
+  .sync-info {font-size:12px}
+  .sync-hint {font-size:11px;line-height:1.5}
+  .status {padding:11px 13px;font-size:12px;line-height:1.7}
+  .mapping summary {padding:15px}
+  .mapping summary small {display:block;font-size:11px;margin:3px 0 0}
+  .mapping-body,.aliases-body {padding:0 15px 15px}
+  .mapping-body>p,.aliases-body>p {font-size:12px;line-height:1.8}
+  .mapping-fields {grid-template-columns:repeat(2,minmax(0,1fr));gap:11px}
+  .mapping-fields label,.alias-form label,.filter-controls label {font-size:12px}
+  .mapping select,.alias-form select,.alias-form input,.filter-controls input {font-size:16px;min-height:44px;height:44px}
+  .mapping-action {display:grid;gap:10px}
+  .mapping-action span {font-size:12px}
+  .alias-form {grid-template-columns:1fr;gap:11px}
+  .alias-form button {grid-column:auto}
+  .alias-toolbar {gap:8px}
+  .alias-toolbar>div {gap:12px}
+  .alias-list {max-height:260px}
+  .period-selector {padding:12px;gap:11px}
+  .period-caption {font-size:12px}
+  .period-caption small {font-size:11px}
+  .period-buttons {width:100%;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:3px}
+  .period-btn {min-height:41px;font-size:12px;padding:8px 3px}
+  .period-help {font-size:11px;line-height:1.55}
+  .filter-controls {grid-template-columns:repeat(2,minmax(0,1fr));gap:11px}
+  .filter-controls .search-field {grid-column:1/-1}
+  .filters-head {margin-bottom:13px}
+  .filters-head h2 {font-size:18px}
+  .text-btn {font-size:12px;min-height:30px}
+  .kpis {gap:10px;margin:14px 0}
+  .kpi {padding:14px 12px;min-height:114px}
+  .kpi-label {font-size:11px;line-height:1.45;gap:4px}
+  .kpi strong {font-size:29px;line-height:1.4;margin:7px 0 2px}
+  .kpi small {font-size:10px;line-height:1.4;display:block}
+  .fresh-tracks {padding:14px}
+  .fresh-tracks h2 {font-size:16px}
+  .fresh-tracks p {font-size:12px}
+  .fresh-card {flex-basis:162px;padding:11px}
+  .fresh-card strong {font-size:13px}
+  .fresh-card small {font-size:11px}
+  .ranking-panel,.month-panel,.posts-panel {padding:17px 13px;margin-bottom:12px}
+  .panel-heading {margin-bottom:15px}
+  .heading-group h2 {font-size:19px;line-height:1.4}
+  .heading-group p {font-size:12px;line-height:1.7}
+  .section-micro {font-size:10px}
+  .export-btn {padding:8px 9px;min-height:38px;font-size:11px}
+  .rank-item {min-height:66px;grid-template-columns:24px minmax(0,1fr) 42px 46px;gap:6px;padding:9px 7px}
+  .rank-item.has-art {grid-template-columns:22px 33px minmax(0,1fr) 32px 43px;gap:5px;padding:9px 6px}
+  .rank-art {width:33px;height:33px}
+  .rank-name {font-size:13px;line-height:1.5}
+  .rank-sub {font-size:11px;line-height:1.5}
+  .rank-movement {font-size:10px;padding:1px 5px}
+  .rank-place {font-size:12px}
+  .rank-count strong {font-size:16px}
+  .rank-count small {font-size:10px}
+  .rank-track {height:6px}
+  .view-more {min-height:45px;font-size:12px}
+  .user-ranking {display:grid;grid-template-columns:1fr;gap:6px}
+  .user-ranking .rank-item {grid-template-columns:25px minmax(0,1fr) 54px 48px;gap:7px}
+  .organizer-controls {padding:12px;align-items:stretch;gap:10px;margin-bottom:14px}
+  .organizer-control-text {flex-basis:100%}
+  .organizer-control-text strong {font-size:13px}
+  .organizer-control-text span {font-size:11px}
+  .organizer-toggle {width:100%;min-height:44px;font-size:13px}
+  .small-heading {display:block;margin:2px 0 0;font-size:12px}
+  .month-chart-container {padding:9px 5px}
+  .month-foot {font-size:12px;line-height:1.65}
+  .scroll-hint {font-size:11px}
+  th,td {padding:10px;font-size:12px;line-height:1.65}
+  .table-footer {flex-wrap:wrap;font-size:12px}
+  .pager button {width:40px;height:40px}
+  .rules-note {font-size:11px;padding:8px 2px 20px;line-height:1.85}
+  .footer {font-size:11px;padding:22px 2px 24px;line-height:1.7}
+}
+@media (max-width:380px) {
+  .brand-text {font-size:11px}
+  .brand-text small {font-size:9px}
+  .share-top {font-size:10px;padding:7px 6px}
+  .hero h1 {font-size:25px}
+  .hero-main {padding:17px 14px}
+  .hero-tags span {font-size:10px}
+  .mapping-fields {grid-template-columns:1fr}
+  .rank-item.has-art {grid-template-columns:21px 30px minmax(0,1fr) 28px 39px;gap:4px;padding:8px 5px}
+  .rank-art {width:30px;height:30px}
+  .rank-name {font-size:12px}
+  .rank-count strong {font-size:14px}
+  .rank-item {grid-template-columns:23px minmax(0,1fr) 35px 43px}
+  .user-ranking .rank-item {grid-template-columns:23px minmax(0,1fr) 45px 43px}
 }
