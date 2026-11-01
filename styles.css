@@ -818,3 +818,29 @@ h1 {
 @media (max-width:380px) {
   .hero-main {padding:17px 14px}
 }
+
+
+/* v3.5: links from requested song titles to videos or clearly labeled searches */
+.song-cell .song-video-link {
+  display:inline-block;
+  color:#075e7d;
+  font-weight:900;
+  text-decoration:underline;
+  text-decoration-color:#12c8d6;
+  text-decoration-thickness:2px;
+  text-underline-offset:3px;
+  overflow-wrap:anywhere;
+}
+.song-cell .song-video-link:hover {color:#c42592;text-decoration-color:#ff48b6}
+.song-video-meta {display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:3px;font-size:10px;font-weight:700}
+.song-video-meta .video-exact {color:#087e73}
+.song-video-meta .video-search {color:#7b5988}
+.song-video-meta .video-nico-search {color:#a43283;text-decoration:underline;text-underline-offset:2px}
+.song-video-meta .video-nico-search:hover {color:#812062}
+.video-link-note {color:#536880;font-size:11px;margin:-5px 0 12px;line-height:1.8}
+.video-link-note strong {color:#19536f}
+@media (max-width:720px) {
+  .song-cell .song-video-link {font-size:12px;line-height:1.6}
+  .song-video-meta {font-size:10px;gap:6px;line-height:1.7}
+  .video-link-note {font-size:11px;margin:0 0 12px}
+}

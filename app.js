@@ -1,6 +1,7 @@
 import { FIELDS, parseSheetCSV, guessMapping, createRecords, filterRecords, aggregateAll, safeHttpUrl, csvExport, normalizeName, userKey } from './lib/analytics.mjs';
 import { combinedAliases, cleanAliases, removeDuplicateRequests, periodFor, computeTrends, makeTrends } from './lib/v3.mjs';
 import { visibleUserRanking, ORGANIZER_NAMES } from './lib/organizers.mjs';
+import { songVideoLinks, inheritVideoUrls } from './lib/video.mjs';
 
 const $ = id => document.getElementById(id);
 const nf = new Intl.NumberFormat('ja-JP');
@@ -13,7 +14,7 @@ const STATE = {
   dedupe: true, duplicateCount: 0, lastFetchedAt: 0, lastAttemptAt: 0,
   lastCSV: null, lastGid: null, showOrganizers: false
 };
-const MAP_IDS = { song: 'mapSong', artist: 'mapArtist', user: 'mapUser', date: 'mapDate', url: 'mapUrl', cover: 'mapCover' };
+const MAP_IDS = { song: 'mapSong', artist: 'mapArtist', user: 'mapUser', date: 'mapDate', url: 'mapUrl', cover: 'mapCover', video: 'mapVideo', youtube: 'mapYoutube', niconico: 'mapNiconico' };
 const RANK_FIELDS = { songs: 'song', artists: 'artist', users: 'user' };
 const MAX_CSV_SIZE = 5 * 1024 * 1024;
 const DEMO = `曲名,アーティスト,ユーザー名,投稿日,投稿URL
@@ -52,7 +53,7 @@ async function loadGlobalAliases() {
   STATE.localAliases=cleanAliases(storageGet('voca-v3-aliases',{})); refreshAliasState(); renderAliasList();
 }
 function rebuildRecords(shouldRender = true) {
-  const raw=createRecords(STATE.data,STATE.mapping,STATE.aliases);
+  const raw=inheritVideoUrls(createRecords(STATE.data,STATE.mapping,STATE.aliases));
   const result=removeDuplicateRequests(raw,STATE.dedupe);
   STATE.records=result.records; STATE.duplicateCount=result.removed;
   text('dedupeInfo', `現在 ${nf.format(STATE.duplicateCount)} 行を重複として除外中。※ 同じ投稿URL＋同じ楽曲・アーティストの組合せだけを除外します。URLのない行は除外しません。`);
@@ -341,7 +342,29 @@ function renderPosts() {
   }
   for (const r of visible) {
     const tr = elt('tr');
-    tr.append(elt('td','date-cell',r.rawDate || '—'),elt('td','song-cell',r.song || '—'),elt('td','',r.artist || '—'),elt('td','',r.user || '—'));
+    const songTd = elt('td','song-cell');
+    const videoLinks = songVideoLinks(r);
+    if (videoLinks.main) {
+      const main = elt('a','song-video-link',r.song);
+      main.href = videoLinks.main.url;
+      main.target = '_blank';
+      main.rel = 'noopener noreferrer';
+      main.title = videoLinks.main.mode === 'direct' ? `${videoLinks.main.platform}の動画を開く` : 'YouTubeで曲名＋アーティスト名を検索（動画未登録）';
+      main.setAttribute('aria-label', `${r.song}：${main.title}`);
+      songTd.append(main);
+      const info = elt('div','song-video-meta');
+      info.append(elt('span', videoLinks.main.mode === 'direct' ? 'video-exact' : 'video-search',
+        videoLinks.main.mode === 'direct' ? `${videoLinks.main.platform} 動画 ↗` : 'YouTube検索結果 ↗'));
+      if (videoLinks.alternate) {
+        const alt = elt('a','video-nico-search','ニコニコ検索 ↗');
+        alt.href = videoLinks.alternate.url;
+        alt.target = '_blank'; alt.rel = 'noopener noreferrer';
+        alt.setAttribute('aria-label', `${r.song}をニコニコ動画で検索`);
+        info.append(alt);
+      }
+      songTd.append(info);
+    } else songTd.textContent = r.song || '—';
+    tr.append(elt('td','date-cell',r.rawDate || '—'),songTd,elt('td','',r.artist || '—'),elt('td','',r.user || '—'));
     const td = elt('td');
     const url = safeHttpUrl(r.url);
     if (url) { const link = elt('a','post-link','投稿を見る ↗'); link.href = url; link.target = '_blank'; link.rel = 'noopener noreferrer'; td.append(link); }
@@ -360,7 +383,7 @@ function download(kind) {
     artists: [['順位','アーティスト','リクエスト件数','楽曲数','順位変動'],...a.artists.map(g=>[g.rank,g.label,g.count,g.uniqueSongs,STATE.period==='all'?'':STATE.trend.artists.get(g.key)?.change ?? ''])],
     users: [['順位','ユーザー','リクエスト件数','リクエストした楽曲数','順位変動'],...userRanking().map(g=>[g.rank,g.label,g.count,g.uniqueSongs,STATE.period==='all'?'':STATE.trend.users.get(g.key)?.change ?? ''])],
     months: [['月','リクエスト件数'],...a.months.map(v=>[v.month,v.count])],
-    records: [['投稿日','楽曲名','アーティスト名','ユーザー名','投稿URL'],...STATE.filtered.map(r=>[r.rawDate,r.song,r.artist,r.user,r.url])]
+    records: [['投稿日','楽曲名','アーティスト名','ユーザー名','投稿URL','動画URL','YouTube URL','ニコニコURL'],...STATE.filtered.map(r=>[r.rawDate,r.song,r.artist,r.user,r.url,r.video,r.youtube,r.niconico])]
   }[kind];
   if (!out) return;
   const blob = new Blob([csvExport(out)],{type:'text/csv;charset=utf-8'});
