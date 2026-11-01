@@ -1,35 +1,140 @@
 <!doctype html>
 <html lang="ja">
 <head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#0b1120">
-  <meta name="description" content="VocaDBからボカロ曲名・アーティスト・BPM・動画リンクを検索。CSV出力、BPM手動登録、情報補完にも対応。">
-  <title>VocaFinder v5 | ボカロ楽曲検索</title>
-  <link rel="stylesheet" href="styles.css">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="#ボカオバリクエスト のリクエスト楽曲、アーティスト、投稿者ランキングと月別投稿分布を可視化">
+  <meta name="theme-color" content="#f5fbfd">
+  <title>ボカオバリクエスト | ランキング・投稿分析 v3.3</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script type="module" src="/app.js"></script>
 </head>
 <body>
-  <header class="site-header"><div class="wrap topbar"><a class="brand" href="./" aria-label="VocaFinderトップ"><span class="brand-icon">♫</span> Voca<span>Finder</span><small>v5.0</small></a><div class="header-right"><span class="caption" aria-hidden="true">VOCALOID MUSIC DISCOVERY</span><button type="button" class="ghost-btn" id="openSettings">設定・バックアップ</button></div></div></header>
-  <div class="hero"><div class="wrap"><div class="eyebrow"><span class="live-dot"></span> VOCADB × NICOVIDEO × ITUNES</div><h1>ボカロ曲を、<em>もっと自由に探そう。</em></h1><p class="lead">アーティスト作品を優先表示。BPM・投稿日時・カバー・Remixで絞り込めます。</p>
-    <form id="searchForm" class="search-panel">
-      <div class="search-tabs" role="radiogroup" aria-label="検索対象"><label><input type="radio" name="searchMode" value="song" checked><span>曲名で探す</span></label><label><input type="radio" name="searchMode" value="artist"><span>アーティストで探す</span></label></div>
-      <div class="search-line"><label class="sr-only" for="query">検索ワード</label><input type="search" id="query" maxlength="100" required placeholder="例：ゴーストルール"><button type="submit" class="primary" id="searchBtn">検索する <span aria-hidden="true">↗</span></button></div>
-    </form>
-    <div class="examples">試してみる <button data-sample="ゴーストルール" type="button">ゴーストルール</button><button data-sample="千本桜" type="button">千本桜</button><button data-sample="DECO*27" data-mode="artist" type="button">DECO*27</button><button data-sample="Mitchie M" data-mode="artist" type="button">Mitchie M</button></div>
-  </div></div>
-  <main class="wrap content">
-    <div id="artistSection" class="artist-section" hidden><div class="section-head"><h2>アーティスト候補</h2><p>対象のアーティストを選択すると楽曲一覧を取得します。</p></div><div class="artist-grid" id="artistResults"></div><p class="subtle artist-notice" id="artistNotice" hidden></p><div id="channelControls" class="channel-controls" hidden><p id="channelStatus" class="hint" role="status">公式チャンネルを確認中…</p><button class="outlined" type="button" id="manageChannels">公式チャンネルを管理</button><button class="outlined" type="button" id="runChannelCheck">YouTube投稿者を照合</button></div><button id="addArtistSong" class="outlined" type="button" hidden>＋ このアーティストの不足曲を登録</button></div>
-    <div class="results-top"><div><div class="eyebrow small">SONG LIBRARY</div><h2 id="resultsHeading">楽曲を検索してください</h2><p class="subtle" id="resultsSummary">VocaDBから曲を検索し、詳細画面でニコニコ・iTunesの候補を自動で表示します。</p></div><button id="exportCsv" class="outlined" disabled type="button">↓ 表示中をCSV出力</button></div>
-    <section class="filter-panel" aria-label="検索結果の絞り込み"><div class="field bpm-field"><label for="minBpm">BPM 下限</label><input type="number" id="minBpm" placeholder="例: 120" min="20" max="400" step="1"></div><div class="field bpm-field"><label for="maxBpm">BPM 上限</label><input type="number" id="maxBpm" placeholder="例: 150" min="20" max="400" step="1"></div><div class="field sort-field"><label for="sort">並び替え</label><select id="sort"><option value="officialFirst">公式動画・本人作品を優先</option><option value="original">検索順</option><option value="bpmAsc">BPM：低い順</option><option value="bpmDesc">BPM：高い順</option><option value="uploadDesc">動画投稿日：新しい順</option><option value="uploadAsc">動画投稿日：古い順</option><option value="dateDesc">初公開日：新しい順</option><option value="dateAsc">初公開日：古い順</option><option value="name">曲名：五十音・ABC順</option></select></div><label class="check-field"><input type="checkbox" id="onlyKnown"> BPM登録済みのみ</label><label class="check-field"><input type="checkbox" id="includeCover" checked> カバーも含む</label><label class="check-field"><input type="checkbox" id="includeRemix" checked> Remixも含む</label><label class="check-field"><input type="checkbox" id="onlyOfficial"> 本人チャンネル一致のみ</label><button class="text-btn" type="button" id="resetFilters">条件をクリア</button></section>
-    <p class="scope-note" id="scopeNote">※ 投稿順は登録動画の最も古い投稿日を使用し、未登録曲は初公開日で代用します。カバー・Remix判定はVocaDBの楽曲分類に準拠します。</p>
-    <div class="alert" role="status" id="status" aria-live="polite">検索したい曲名・アーティスト名を入力してください。</div>
-    <div class="outside-links" id="externalSearchLinks" hidden></div>
-    <div class="song-grid" id="results" aria-live="polite"></div>
-    <div class="load-area"><button type="button" id="loadMore" class="outlined" hidden>もっと読み込む <span aria-hidden="true">↓</span></button></div>
+  <header class="site-header">
+    <div class="header-inner">
+      <a class="brand" href="#top" aria-label="ボカオバリクエスト 分析トップ">
+        <span class="brand-mark" aria-hidden="true">♬</span>
+        <span class="brand-text">VOCALOID <strong>REQUESTS</strong><small>ボカオバリクエスト分析 <b class="version-pill">v3.3</b></small></span>
+      </a>
+      <nav class="main-nav" aria-label="ページ内メニュー"><a href="#songs">楽曲</a><a href="#artists">アーティスト</a><a href="#months">月別分布</a><a href="#users">投稿者</a><a href="#settings">データ設定</a></nav>
+      <button class="source-link share-top" id="shareBtn" type="button">✦ Xで共有</button><a class="source-link sheet-top" href="https://docs.google.com/spreadsheets/d/10R20NZZYk4FzQ29HN8NcCr7oeSxUcceFKzdMpp9AkUU/edit" target="_blank" rel="noopener noreferrer">元データ ↗</a>
+    </div>
+  </header>
+  <main class="container" id="top">
+    <section class="hero">
+      <div class="hero-main">
+        <div class="eyebrow"><span class="signal-dot"></span> VOCALOID REQUEST ANALYTICS</div>
+        <h1><span class="gradient-text">#ボカオバリクエスト</span><br>リクエスト分析 <small class="hero-version">v3.3</small></h1>
+        <p>みんなのリクエストから、次に盛り上がる一曲を見つけよう。投稿傾向・人気曲・急上昇をリアルタイムにチェック。</p>
+        <div class="hero-tags"><span>♬ 楽曲ランキング</span><span>✧ アーティスト</span><span>▤ 月別分布</span><span>♡ 投稿者</span><span>↗ トレンド比較</span></div>
+        <a href="#settings" class="settings-jump">⚙ データ設定・更新はページ下部 ↓</a>
+      </div>
+      <div class="hero-decor" aria-hidden="true"><span>♪</span><span>♫</span><span>♩</span></div>
+    </section>
+
+    <section class="filters panel" aria-label="絞り込み">
+      <div class="filters-head"><div><span class="section-micro">FILTER</span><h2>絞り込み</h2></div><button type="button" id="resetBtn" class="text-btn">✕ 条件を解除</button></div>
+      <div class="period-selector"><div class="period-caption"><span>集計期間</span><small id="periodLabel">全期間を集計</small></div><div class="period-buttons" role="group" aria-label="集計期間を選択"><button type="button" data-period="all" class="period-btn active" aria-pressed="true">全期間</button><button type="button" data-period="30" class="period-btn" aria-pressed="false">直近30日</button><button type="button" data-period="7" class="period-btn" aria-pressed="false">直近7日</button></div><span class="period-help" id="trendHelp">30日・7日を選ぶと前の同期間との順位変動を表示</span></div>
+      <div class="filter-controls"><label class="search-field"><span>キーワード</span><input id="searchInput" type="search" placeholder="曲名・アーティスト・ユーザーで検索"></label><label><span>開始日</span><input id="startDate" type="date"></label><label><span>終了日</span><input id="endDate" type="date"></label></div>
+      <div id="focusChip" class="focus-chip" hidden></div>
+    </section>
+
+    <section class="kpis" aria-label="集計サマリー">
+      <div class="kpi"><div class="kpi-label">リクエスト総数 <span>◫</span></div><strong id="countAll">—</strong><small>集計対象の行数</small></div>
+      <div class="kpi"><div class="kpi-label">リクエスト楽曲 <span>♫</span></div><strong id="countSongs">—</strong><small>曲名＋アーティストの組合せ</small></div>
+      <div class="kpi"><div class="kpi-label">アーティスト <span>✧</span></div><strong id="countArtists">—</strong><small>ユニークなアーティスト</small></div>
+      <div class="kpi"><div class="kpi-label">投稿ユーザー <span>♡</span></div><strong id="countUsers">—</strong><small>ユニークな投稿者</small></div>
+    </section>
+
+    <section class="fresh-tracks" id="freshTracks" hidden aria-label="最近の初登場楽曲"><div><span class="section-micro">DISCOVER</span><h2>期間内の初登場楽曲 <span class="sparkle">✦</span></h2><p>過去に登場していない新しいリクエストをチェック</p></div><div class="fresh-items" id="freshItems"></div></section>
+    <div class="rankings-grid">
+      <section id="songs" class="panel ranking-panel" aria-labelledby="songTitle">
+        <div class="panel-heading"><div class="heading-group"><div class="section-micro">01 / TOP TRACKS</div><h2 id="songTitle">楽曲ランキング</h2><p>投稿数の多い楽曲順。期間を選ぶと順位の変動も確認できます</p></div><button class="export-btn" type="button" data-export="songs" title="楽曲ランキングのCSVを保存">↓ CSV</button></div>
+        <div class="ranking-list" id="songRanking"><div class="empty">読み込み中…</div></div>
+        <button class="view-more" id="moreSongs" type="button" hidden>すべての楽曲を表示 <span>⌄</span></button>
+      </section>
+      <section id="artists" class="panel ranking-panel" aria-labelledby="artistTitle">
+        <div class="panel-heading"><div class="heading-group"><div class="section-micro">02 / TOP ARTISTS</div><h2 id="artistTitle">アーティストランキング</h2><p>リクエストされた回数が多い順</p></div><button class="export-btn" type="button" data-export="artists" title="アーティストランキングのCSVを保存">↓ CSV</button></div>
+        <div class="ranking-list" id="artistRanking"><div class="empty">読み込み中…</div></div>
+        <button class="view-more" id="moreArtists" type="button" hidden>すべてのアーティストを表示 <span>⌄</span></button>
+      </section>
+    </div>
+
+    <section id="months" class="panel month-panel" aria-labelledby="monthTitle">
+      <div class="panel-heading"><div class="heading-group"><div class="section-micro">03 / POST ACTIVITY</div><h2 id="monthTitle">投稿分布 <span class="small-heading">月ごとの投稿数</span></h2><p>投稿された月ごとのリクエスト件数。投稿がない月も0件として表示します。</p></div><button class="export-btn" type="button" data-export="months">↓ CSV</button></div>
+      <div id="monthlyChart" class="month-chart-container"><div class="empty">データの読み込み後に表示します</div></div>
+      <div class="month-foot" id="monthFoot"></div><p class="scroll-hint">※ 月が多い場合はグラフを左右にスクロールして確認できます。</p>
+      <details class="month-detail"><summary>月別件数の表を表示</summary><div class="table-scroll"><table><thead><tr><th>月</th><th>投稿数</th></tr></thead><tbody id="monthlyRows"></tbody></table></div></details>
+    </section>
+
+    <section id="users" class="panel ranking-panel user-panel" aria-labelledby="userTitle">
+      <div class="panel-heading"><div class="heading-group"><div class="section-micro">04 / TOP REQUESTERS</div><h2 id="userTitle">投稿ランキング</h2><p>リクエスト投稿が多いユーザーを表示</p></div><button class="export-btn" type="button" data-export="users">↓ CSV</button></div>
+      <div class="organizer-controls" aria-label="レギュラーDJのランキング表示設定">
+        <div class="organizer-control-text">
+          <strong>レギュラーDJの表示</strong>
+          <span id="organizerNote" aria-live="polite">レギュラーDJ4名を除外して表示しています</span>
+        </div>
+        <button id="toggleOrganizers" class="organizer-toggle" type="button" aria-pressed="false">レギュラーDJ4名を表示する</button>
+      </div>
+      <div class="ranking-list user-ranking" id="userRanking"><div class="empty">読み込み中…</div></div>
+      <button class="view-more" id="moreUsers" type="button" hidden>すべてのユーザーを表示 <span>⌄</span></button>
+    </section>
+
+    <section class="panel posts-panel" id="posts" aria-labelledby="postsTitle">
+      <div class="panel-heading"><div class="heading-group"><div class="section-micro">ORIGINAL POSTS</div><h2 id="postsTitle">投稿データ一覧</h2><p>リクエスト元のX投稿へアクセスできます。</p></div><button class="export-btn" type="button" data-export="records">↓ CSV</button></div>
+      <div class="table-scroll"><table class="records-table"><thead><tr><th>投稿日</th><th>楽曲</th><th>アーティスト</th><th>投稿ユーザー</th><th>投稿リンク</th></tr></thead><tbody id="postsBody"></tbody></table></div>
+      <div class="table-footer"><span id="postCount">—</span><div class="pager"><button id="prevBtn" type="button" aria-label="前のページ">←</button><span id="pageLabel">—</span><button id="nextBtn" type="button" aria-label="次のページ">→</button></div></div>
+    </section>
+    <section class="data-management" id="settings" aria-labelledby="settingsTitle">
+      <div class="settings-heading">
+        <div><span class="section-micro">DATA MANAGEMENT</span><h2 id="settingsTitle">データ管理・更新</h2><p>集計元の更新、列の確認、表記の統合はこちらから設定できます。</p></div>
+        <a href="#top" class="settings-back-top">↑ ページ先頭へ戻る</a>
+      </div>
+    <section class="data-source panel" aria-label="データソース">
+      <div class="source-topline"><span class="section-micro">DATA SOURCE</span><span class="sheet-label"><span class="sheet-dot"></span> Google Sheets</span></div>
+      <div class="source-main"><div><h2>集計元データ</h2><p>Googleスプレッドシートの行を読み取り、集計します。更新時は再取得できます。</p></div>
+        <div class="source-actions"><label class="gid-wrap"><span>シートの gid</span><input type="text" id="gidInput" value="0" inputmode="numeric" maxlength="20" aria-label="対象タブのgid"></label><button class="btn btn-primary" type="button" id="refreshBtn">↻ データを更新</button></div>
+      </div>
+      <div class="sync-settings"><label class="toggle-line"><input type="checkbox" id="autoRefresh" checked><span>5分ごとに自動更新</span></label><span class="sync-info" id="lastUpdated">最終更新：未取得</span><span class="sync-hint">開いている間と再訪時に最新のシートを確認</span></div>
+      <div class="source-alternates"><button class="text-btn" type="button" id="demoBtn">サンプル表示</button><span>／</span><label class="text-btn file-pick">CSVを読み込む<input type="file" id="csvFile" accept=".csv,text/csv" aria-label="Google SheetsからダウンロードしたCSVファイルを読み込む"></label><span class="source-note">※ CSVはブラウザ内だけで処理され、送信されません</span></div>
+    </section>
+    <div class="status neutral" id="status" role="status" aria-live="polite">スプレッドシートに接続しています…</div>
+
+    <details class="mapping panel" id="mappingDetails">
+      <summary><span>⚙ 列の設定 <small>データの列名を自動判定／手動調整</small></span><span class="caret">⌄</span></summary>
+      <form id="mappingForm" class="mapping-body">
+        <p>列名が異なる場合は、スプレッドシートの各列を対応付けて「適用」を押してください。曲名・アーティスト・ユーザー・投稿日・投稿URLを使用します。</p>
+        <div class="mapping-fields">
+          <label>曲名 <select id="mapSong"></select></label>
+          <label>アーティスト <select id="mapArtist"></select></label>
+          <label>投稿ユーザー <select id="mapUser"></select></label>
+          <label>投稿日 <select id="mapDate"></select></label>
+          <label>投稿URL <select id="mapUrl"></select></label><label>ジャケット画像URL（任意）<select id="mapCover"></select></label>
+        </div>
+        <div class="mapping-action"><button type="submit" class="btn btn-primary">この列設定で集計</button><span id="mappingHint"></span></div>
+      </form>
+    </details>
+
+    <details class="mapping panel aliases-panel" id="aliasesDetails">
+      <summary><span>✦ 表記ゆれの統合 <small>同じ楽曲・アーティスト・ユーザーをまとめる</small></span><span class="caret">⌄</span></summary>
+      <div class="aliases-body">
+        <p>自動正規化に加えて、別表記を手動で統合できます。ここで登録したルールは<b>このブラウザ内だけ</b>に保存されます。全閲覧者に反映する場合は出力したJSONを <code>aliases.json</code> としてGitHubへ配置してください。</p>
+        <form id="aliasForm" class="alias-form">
+          <label>種類<select id="aliasKind"><option value="songs">楽曲</option><option value="artists">アーティスト</option><option value="users">ユーザー</option></select></label>
+          <label>元の表記<input id="aliasFrom" type="text" placeholder="例：表記ゆれした曲名" maxlength="200" required></label>
+          <label>統一する表記<input id="aliasTo" type="text" placeholder="例：正式な曲名" maxlength="200" required></label>
+          <button class="btn btn-primary" type="submit">統合ルールを追加</button>
+        </form>
+        <div class="alias-toolbar"><span id="aliasCount">登録 0 件</span><div><button type="button" class="text-btn" id="exportAliases">統合ルールをJSON保存</button><button type="button" class="text-btn" id="clearAliases">このブラウザのルールを削除</button></div></div>
+        <div id="aliasList" class="alias-list"><span class="subtle">登録済みの統合ルールはありません。</span></div>
+        <label class="toggle-line dedupe-toggle"><input id="dedupeToggle" type="checkbox" checked>同じ投稿URL＋同じ楽曲の重複行を1件にまとめる</label>
+        <p class="fine-note" id="dedupeInfo">※ 1つの投稿に異なる楽曲が複数記載されている場合は別リクエストとして扱います。</p>
+      </div>
+    </details>
+    </section>
+
+    <div class="rules-note">集計基準：<strong>1行＝1リクエスト</strong>（重複除外ONの場合は同じ投稿URL・同じ楽曲を1件に統合）。表記ゆれは正規化＋登録済み統合ルールを適用。順位変動は選択した7日／30日とその直前の同期間を比較します。日付は日本時間を使用します。自動更新はページを開いている間のみ実行します。投稿ランキングでは初期状態でレギュラーDJ4名を除外しますが、その他の集計と投稿一覧には含まれます。</div>
+    <footer class="footer"><span>VOCALOID REQUESTS / #ボカオバリクエスト</span><span>v3.3 · Vercel + Google Sheets (read-only)</span></footer>
   </main>
-  <dialog id="addDialog" class="dialog"><div class="dialog-header"><span>不足している本人投稿・配信曲を登録</span><button class="close-btn" type="button" data-close="addDialog" aria-label="閉じる">×</button></div><form id="addSongForm" class="dialog-body"><p class="subtle">VocaDBに未登録の曲も、投稿URLを確認したうえでこのブラウザ内に追加できます。登録内容はJSONバックアップで引き継げます。</p><div class="edit-grid"><div class="field wide"><label for="addSongName">曲名</label><input id="addSongName" required maxlength="160" placeholder="曲名"></div><div class="field wide"><label for="addSongUrl">YouTubeまたはニコニコURL</label><input id="addSongUrl" type="url" required placeholder="https://youtu.be/..."></div><div class="field"><label for="addSongDate">動画投稿日</label><input id="addSongDate" type="date"></div><div class="field"><label for="addSongType">種類</label><select id="addSongType"><option value="Original">オリジナル</option><option value="Cover">カバー</option><option value="Remix">Remix</option><option value="Other">その他</option></select></div></div><p id="addSongMessage" role="status" class="hint"></p><div class="button-row"><button class="primary" type="submit">楽曲を追加</button></div></form></dialog><dialog id="detailDialog" class="dialog"><div class="dialog-header"><span>楽曲詳細・情報補完</span><button class="close-btn" type="button" data-close="detailDialog" aria-label="閉じる">×</button></div><div id="detailBody" class="dialog-body"></div></dialog>
-  <dialog id="channelDialog" class="dialog"><div class="dialog-header"><span>公式YouTubeチャンネルの管理</span><button type="button" class="close-btn" data-close="channelDialog" aria-label="閉じる">×</button></div><form id="channelForm" class="dialog-body"><h3 id="channelArtistName"></h3><p class="hint">VocaDBでOfficialと分類されているリンクを自動取得。公式サイトやご本人のSNSを見て信頼できるチャンネルURLだけ手動登録してください。</p><h3>VocaDB登録の公式リンク</h3><div id="autoChannelList"></div><h3>追加の公式チャンネル（1行1URL）</h3><textarea id="manualChannelUrls" rows="5" placeholder="https://www.youtube.com/@artist
-https://www.youtube.com/channel/UC..." aria-label="手動の公式YouTubeチャンネルURL"></textarea><p id="channelMessage" class="hint" role="status"></p><button class="primary" type="submit">公式チャンネルを保存</button></form></dialog>
-  <dialog id="settingsDialog" class="dialog"><div class="dialog-header"><span>設定・バックアップ</span><button type="button" class="close-btn" data-close="settingsDialog" aria-label="閉じる">×</button></div><div class="dialog-body"><h2>データの取得方法</h2><p class="subtle">VocaDBの楽曲データを検索し、曲の詳細を開くとニコニコ（スナップショット検索API）とiTunes（JSONP）で候補を自動検索します。誤登録を避けるため、候補は自動で確定せず、確認後に採用します。YouTubeは登録済みリンクを表示し、必要に応じて無料枠のYouTube Data APIキーで投稿チャンネルIDを照合します。キーなしでもチャンネルURLの手動照合ができます。</p><p class="subtle">ニコニコAPIはサイトのブラウザ通信が制限される場合があります。その場合は外部検索をご利用ください。iTunesの配信日は実際の初回配信日とは異なる場合があります。</p><hr><h2>YouTube投稿者チャンネルの自動照合（任意）</h2><p class="subtle">APIキーなしでもVocaDBの公式チャンネル候補と投稿者URLの手動照合が利用できます。YouTube Data API v3のキーを設定すると、動画のchannelIdと公式チャンネルを照合できます。キーはブラウザのセッションにのみ保存し、バックアップやGitHubには含めません。公開ブラウザのキーは完全な秘密にはできません。Google Cloud側でYouTube Data API v3のみに制限し、GitHub PagesのHTTPリファラー制限を設定してください。</p><div class="button-row"><input id="youtubeApiKey" type="password" autocomplete="off" spellcheck="false" aria-label="YouTube Data APIキー" placeholder="YouTube Data API キー" style="flex:1;min-width:210px"><button id="applyYoutubeKey" type="button" class="outlined">キーを適用</button><button id="removeYoutubeKey" type="button" class="outlined">キー削除</button></div><p id="youtubeKeyMessage" class="hint" role="status"></p><hr><h2>BPM・動画URL・配信日をバックアップ</h2><p class="subtle">BPM・公式チャンネル・投稿者URLの手動登録はこの端末・ブラウザ内に保存されます。別の端末へ移すにはJSONのエクスポート／インポートを使います。自分で追加した不足曲もバックアップされます。</p><div class="button-row"><button id="exportBackup" type="button" class="outlined">設定をJSON出力</button><label class="outlined file-button">JSONを取り込む<input type="file" id="importBackup" accept=".json,application/json" hidden></label></div><p id="settingsMessage" role="status" class="subtle"></p><hr><h2>データ利用について</h2><p class="subtle">アーティスト名の完全一致候補は自動で選択し、最大500曲を順次読み込みます。外部で確認した補完曲は参考元を明示します。VocaDBの「Original PV」は公式・権利者許諾の動画を示し、投稿アカウントが本人かまでは保証しません。検索時・詳細表示時に外部サービスと通信します。サイト独自のサーバーやユーザー登録はありません。CSVには現在の表示結果のみが含まれます。</p></div></dialog>
-  <footer class="footer"><div class="wrap footer-inner"><div><strong>♫ VocaFinder</strong><p>Unofficial fan-made music search. Powered by <a href="https://vocadb.net/" target="_blank" rel="noopener noreferrer">VocaDB</a>.</p></div><p>公開日はVocaDB上の初公開日、配信日は確認されたストア情報または手動登録です。登録画像は公式ジャケットとは限りません。動画・画像の権利は各権利者に帰属します。</p></div></footer>
-  <script type="module" src="js/app.js"></script>
-</body></html>
+</body>
+</html>
