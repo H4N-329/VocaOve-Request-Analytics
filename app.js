@@ -188,10 +188,10 @@ function resetFilters() {
 function updateOrganizerToggle() {
   const btn=$('toggleOrganizers');
   btn.setAttribute('aria-pressed',String(STATE.showOrganizers));
-  btn.textContent=STATE.showOrganizers ? '運営4名を非表示にする' : '運営4名を表示する';
+  btn.textContent=STATE.showOrganizers ? 'レギュラーDJ4名を非表示にする' : 'レギュラーDJ4名を表示する';
   text('organizerNote', STATE.showOrganizers
-    ? `運営4名（${ORGANIZER_NAMES.join('・')}）を含めて表示中`
-    : `運営4名（${ORGANIZER_NAMES.join('・')}）は除外中`);
+    ? `レギュラーDJ4名（${ORGANIZER_NAMES.join('・')}）を含めて表示中`
+    : `レギュラーDJ4名（${ORGANIZER_NAMES.join('・')}）は除外中`);
 }
 function userRanking() { return visibleUserRanking(STATE.analysis?.users || [], STATE.showOrganizers); }
 function recalcUserTrend(p) {

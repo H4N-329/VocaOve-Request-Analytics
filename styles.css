@@ -765,3 +765,25 @@ h1 {
   .rank-item {grid-template-columns:23px minmax(0,1fr) 35px 43px}
   .user-ranking .rank-item {grid-template-columns:23px minmax(0,1fr) 45px 43px}
 }
+
+
+/* v3.3 — Data controls follow the analytics content */
+.data-management {margin:34px 0 16px;scroll-margin-top:90px}
+.settings-heading {display:flex;justify-content:space-between;align-items:end;gap:16px;margin:0 2px 18px;padding-bottom:12px;border-bottom:2px solid rgba(22,200,215,.22)}
+.settings-heading h2 {font-size:22px;line-height:1.4;letter-spacing:-.03em;margin-top:3px;color:#182a40}
+.settings-heading p {color:#51627a;font-size:12px;line-height:1.7;margin-top:3px}
+.settings-back-top,.settings-jump {color:#117c8b;font-size:12px;font-weight:800;text-decoration:none}
+.settings-back-top:hover,.settings-jump:hover {color:#c11b84;text-decoration:underline}
+.settings-back-top {white-space:nowrap;padding:7px 0}
+.settings-jump {display:inline-block;margin-top:13px;border-bottom:1px solid currentColor;padding-bottom:2px}
+.data-management .data-source {margin-bottom:12px}
+.data-management .mapping {margin-bottom:12px}
+.data-management .status {margin:0 0 12px}
+@media(max-width:720px) {
+  .data-management {margin-top:22px}
+  .settings-heading {align-items:flex-start;flex-wrap:wrap;gap:8px;margin-bottom:13px}
+  .settings-heading h2 {font-size:20px}
+  .settings-heading p {font-size:12px}
+  .settings-back-top {font-size:12px;min-height:35px}
+  .settings-jump {font-size:12px;margin-top:10px}
+}
