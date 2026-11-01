@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="#ボカオバリクエスト のリクエスト楽曲、アーティスト、投稿者ランキングと月別投稿分布を可視化">
+  <meta name="theme-color" content="#131026">
+  <title>ボカオバリクエスト | ランキング・投稿分析</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script type="module" src="/app.js"></script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="header-inner">
+      <a class="brand" href="#top" aria-label="ボカオバリクエスト 分析トップ">
+        <span class="brand-mark" aria-hidden="true">♬</span>
+        <span class="brand-text">VOCALOID <strong>REQUESTS</strong><small>ボカオバリクエスト分析</small></span>
+      </a>
+      <nav class="main-nav" aria-label="ページ内メニュー"><a href="#songs">楽曲</a><a href="#artists">アーティスト</a><a href="#months">月別分布</a><a href="#users">投稿者</a></nav>
+      <a class="source-link" href="https://docs.google.com/spreadsheets/d/10R20NZZYk4FzQ29HN8NcCr7oeSxUcceFKzdMpp9AkUU/edit" target="_blank" rel="noopener noreferrer">元データ <span aria-hidden="true">↗</span></a>
+    </div>
+  </header>
+  <main class="container" id="top">
+    <section class="hero">
+      <div class="hero-main">
+        <div class="eyebrow"><span class="signal-dot"></span> VOCALOID REQUEST ANALYTICS</div>
+        <h1><span class="gradient-text">#ボカオバリクエスト</span><br>リクエスト分析</h1>
+        <p>みんながリクエストしたボカロ曲を、楽曲・アーティスト・投稿者別にランキング。投稿の盛り上がりも月ごとに可視化します。</p>
+        <div class="hero-tags"><span>♬ 楽曲ランキング</span><span>✧ アーティスト</span><span>▤ 月別分布</span><span>♡ 投稿者</span></div>
+      </div>
+      <div class="hero-decor" aria-hidden="true"><span>♪</span><span>♫</span><span>♩</span></div>
+    </section>
+
+    <section class="data-source panel" aria-label="データソース">
+      <div class="source-topline"><span class="section-micro">DATA SOURCE</span><span class="sheet-label"><span class="sheet-dot"></span> Google Sheets</span></div>
+      <div class="source-main"><div><h2>集計元データ</h2><p>Googleスプレッドシートの行を読み取り、集計します。更新時は再取得できます。</p></div>
+        <div class="source-actions"><label class="gid-wrap"><span>シートの gid</span><input type="text" id="gidInput" value="0" inputmode="numeric" maxlength="20" aria-label="対象タブのgid"></label><button class="btn btn-primary" type="button" id="refreshBtn">↻ データを更新</button></div>
+      </div>
+      <div class="source-alternates"><button class="text-btn" type="button" id="demoBtn">サンプル表示</button><span>／</span><label class="text-btn file-pick">CSVを読み込む<input type="file" id="csvFile" accept=".csv,text/csv" aria-label="Google SheetsからダウンロードしたCSVファイルを読み込む"></label><span class="source-note">※ CSVはブラウザ内だけで処理され、送信されません</span></div>
+    </section>
+    <div class="status neutral" id="status" role="status" aria-live="polite">スプレッドシートに接続しています…</div>
+
+    <details class="mapping panel" id="mappingDetails">
+      <summary><span>⚙ 列の設定 <small>データの列名を自動判定／手動調整</small></span><span class="caret">⌄</span></summary>
+      <form id="mappingForm" class="mapping-body">
+        <p>列名が異なる場合は、スプレッドシートの各列を対応付けて「適用」を押してください。曲名・アーティスト・ユーザー・投稿日・投稿URLを使用します。</p>
+        <div class="mapping-fields">
+          <label>曲名 <select id="mapSong"></select></label>
+          <label>アーティスト <select id="mapArtist"></select></label>
+          <label>投稿ユーザー <select id="mapUser"></select></label>
+          <label>投稿日 <select id="mapDate"></select></label>
+          <label>投稿URL <select id="mapUrl"></select></label>
+        </div>
+        <div class="mapping-action"><button type="submit" class="btn btn-primary">この列設定で集計</button><span id="mappingHint"></span></div>
+      </form>
+    </details>
+
+    <section class="filters panel" aria-label="絞り込み">
+      <div class="filters-head"><div><span class="section-micro">FILTER</span><h2>絞り込み</h2></div><button type="button" id="resetBtn" class="text-btn">✕ 条件を解除</button></div>
+      <div class="filter-controls"><label class="search-field"><span>キーワード</span><input id="searchInput" type="search" placeholder="曲名・アーティスト・ユーザーで検索"></label><label><span>開始日</span><input id="startDate" type="date"></label><label><span>終了日</span><input id="endDate" type="date"></label></div>
+      <div id="focusChip" class="focus-chip" hidden></div>
+    </section>
+
+    <section class="kpis" aria-label="集計サマリー">
+      <div class="kpi"><div class="kpi-label">リクエスト総数 <span>◫</span></div><strong id="countAll">—</strong><small>集計対象の行数</small></div>
+      <div class="kpi"><div class="kpi-label">リクエスト楽曲 <span>♫</span></div><strong id="countSongs">—</strong><small>曲名＋アーティストの組合せ</small></div>
+      <div class="kpi"><div class="kpi-label">アーティスト <span>✧</span></div><strong id="countArtists">—</strong><small>ユニークなアーティスト</small></div>
+      <div class="kpi"><div class="kpi-label">投稿ユーザー <span>♡</span></div><strong id="countUsers">—</strong><small>ユニークな投稿者</small></div>
+    </section>
+
+    <div class="rankings-grid">
+      <section id="songs" class="panel ranking-panel" aria-labelledby="songTitle">
+        <div class="panel-heading"><div class="heading-group"><div class="section-micro">01 / TOP TRACKS</div><h2 id="songTitle">楽曲ランキング</h2><p>リクエスト投稿が多い楽曲から順に表示</p></div><button class="export-btn" type="button" data-export="songs" title="楽曲ランキングのCSVを保存">↓ CSV</button></div>
+        <div class="ranking-list" id="songRanking"><div class="empty">読み込み中…</div></div>
+        <button class="view-more" id="moreSongs" type="button" hidden>すべての楽曲を表示 <span>⌄</span></button>
+      </section>
+      <section id="artists" class="panel ranking-panel" aria-labelledby="artistTitle">
+        <div class="panel-heading"><div class="heading-group"><div class="section-micro">02 / TOP ARTISTS</div><h2 id="artistTitle">アーティストランキング</h2><p>リクエストされた回数が多い順</p></div><button class="export-btn" type="button" data-export="artists" title="アーティストランキングのCSVを保存">↓ CSV</button></div>
+        <div class="ranking-list" id="artistRanking"><div class="empty">読み込み中…</div></div>
+        <button class="view-more" id="moreArtists" type="button" hidden>すべてのアーティストを表示 <span>⌄</span></button>
+      </section>
+    </div>
+
+    <section id="months" class="panel month-panel" aria-labelledby="monthTitle">
+      <div class="panel-heading"><div class="heading-group"><div class="section-micro">03 / POST ACTIVITY</div><h2 id="monthTitle">投稿分布 <span class="small-heading">月ごとの投稿数</span></h2><p>投稿された月ごとのリクエスト件数。投稿がない月も0件として表示します。</p></div><button class="export-btn" type="button" data-export="months">↓ CSV</button></div>
+      <div id="monthlyChart" class="month-chart-container"><div class="empty">データの読み込み後に表示します</div></div>
+      <div class="month-foot" id="monthFoot"></div><p class="scroll-hint">※ 月が多い場合はグラフを左右にスクロールして確認できます。</p>
+      <details class="month-detail"><summary>月別件数の表を表示</summary><div class="table-scroll"><table><thead><tr><th>月</th><th>投稿数</th></tr></thead><tbody id="monthlyRows"></tbody></table></div></details>
+    </section>
+
+    <section id="users" class="panel ranking-panel user-panel" aria-labelledby="userTitle">
+      <div class="panel-heading"><div class="heading-group"><div class="section-micro">04 / TOP REQUESTERS</div><h2 id="userTitle">投稿ランキング</h2><p>リクエスト投稿が多いユーザーを表示</p></div><button class="export-btn" type="button" data-export="users">↓ CSV</button></div>
+      <div class="ranking-list user-ranking" id="userRanking"><div class="empty">読み込み中…</div></div>
+      <button class="view-more" id="moreUsers" type="button" hidden>すべてのユーザーを表示 <span>⌄</span></button>
+    </section>
+
+    <section class="panel posts-panel" id="posts" aria-labelledby="postsTitle">
+      <div class="panel-heading"><div class="heading-group"><div class="section-micro">ORIGINAL POSTS</div><h2 id="postsTitle">投稿データ一覧</h2><p>リクエスト元のX投稿へアクセスできます。</p></div><button class="export-btn" type="button" data-export="records">↓ CSV</button></div>
+      <div class="table-scroll"><table class="records-table"><thead><tr><th>投稿日</th><th>楽曲</th><th>アーティスト</th><th>投稿ユーザー</th><th>投稿リンク</th></tr></thead><tbody id="postsBody"></tbody></table></div>
+      <div class="table-footer"><span id="postCount">—</span><div class="pager"><button id="prevBtn" type="button" aria-label="前のページ">←</button><span id="pageLabel">—</span><button id="nextBtn" type="button" aria-label="次のページ">→</button></div></div>
+    </section>
+    <div class="rules-note">集計基準：スプレッドシートの<strong>1行＝1リクエスト</strong>。楽曲は「曲名＋アーティスト名」で集計。表記の全角／半角・英字の大文字／小文字・余分な空白は吸収し、Remixなど異なる曲名は別扱いです。日付は日本時間を基準に集計します。</div>
+    <footer class="footer"><span>VOCALOID REQUESTS / #ボカオバリクエスト</span><span>Built for Vercel · Google Sheets (read-only)</span></footer>
+  </main>
+</body>
+</html>
