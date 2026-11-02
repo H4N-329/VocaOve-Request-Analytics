@@ -3,6 +3,7 @@ import { combinedAliases, cleanAliases, removeDuplicateRequests, periodFor, comp
 import { visibleUserRanking, ORGANIZER_NAMES } from './lib/organizers.mjs';
 import { songVideoLinks, inheritVideoUrls } from './lib/video.mjs';
 import { cleanVideoMap, chosenVideoFor } from './lib/vocadb.mjs';
+import { recommendHiddenGems } from './lib/discovery.mjs';
 
 const $ = id => document.getElementById(id);
 const nf = new Intl.NumberFormat('ja-JP');
@@ -14,7 +15,8 @@ const STATE = {
   globalAliases:{songs:{},artists:{},users:{}}, localAliases:{songs:{},artists:{},users:{}},
   dedupe: true, duplicateCount: 0, lastFetchedAt: 0, lastAttemptAt: 0,
   lastCSV: null, lastGid: null, showOrganizers: false,
-  globalVideos:{}, localVideos:{}, videoCache:new Map(), activeVideoRecord:null, videoRequestId:0
+  globalVideos:{}, localVideos:{}, videoCache:new Map(), activeVideoRecord:null, videoRequestId:0,
+  hiddenGems:[], gemStats:null, previousGems:[]
 };
 const MAP_IDS = { song: 'mapSong', artist: 'mapArtist', user: 'mapUser', date: 'mapDate', url: 'mapUrl', cover: 'mapCover', video: 'mapVideo', youtube: 'mapYoutube', niconico: 'mapNiconico' };
 const RANK_FIELDS = { songs: 'song', artists: 'artist', users: 'user' };
@@ -68,7 +70,7 @@ function updateVideoCount(){
 function saveVideoLinks() {
   STATE.localVideos=cleanVideoMap(STATE.localVideos);
   storageSet('voca-v3-confirmed-videos',STATE.localVideos);
-  updateVideoCount(); renderPosts();
+  updateVideoCount(); renderPosts(); renderGems();
 }
 function downloadVideoLinks() {
   const combined=cleanVideoMap({...STATE.globalVideos,...STATE.localVideos});
@@ -152,9 +154,66 @@ function rebuildRecords(shouldRender = true) {
   const raw=inheritVideoUrls(createRecords(STATE.data,STATE.mapping,STATE.aliases));
   const result=removeDuplicateRequests(raw,STATE.dedupe);
   STATE.records=result.records; STATE.duplicateCount=result.removed;
+  shuffleGems();
   text('dedupeInfo', `現在 ${nf.format(STATE.duplicateCount)} 行を重複として除外中。※ 同じ投稿URL＋同じ楽曲・アーティストの組合せだけを除外します。URLのない行は除外しません。`);
   if (shouldRender) render();
 }
+function shuffleGems() {
+  const picks=recommendHiddenGems(STATE.records, {count:5,previousKeys:STATE.previousGems});
+  STATE.hiddenGems=picks.recommendations;
+  STATE.previousGems=picks.recommendations.map(g=>g.key);
+  STATE.gemStats=picks;
+  renderGems();
+}
+function renderGems() {
+  const target=$('gemsList');
+  clear(target);
+  const groups=STATE.hiddenGems;
+  $('rerollGems').disabled = !STATE.gemStats || STATE.gemStats.eligibleCount < 2;
+  if (!groups.length) {
+    target.append(elt('p','gems-empty', STATE.records.length ? '曲名とボカロPが登録された楽曲がありません。列の設定を確認してください。' : 'データを読み込むと、おすすめの楽曲を表示します。'));
+    text('gemsFoot','データの読み込み後に候補を抽選します。');
+    return;
+  }
+  for (let i=0;i<groups.length;i++) {
+    const g=groups[i];
+    const r=STATE.records.find(row=>row.songKey===g.key);
+    const card=elt('article','gem-card');
+    const top=elt('div','gem-top');
+    top.append(elt('span','gem-index',`PICK ${String(i+1).padStart(2,'0')}`),elt('span','gem-spark','✦'));
+    const body=elt('div','gem-body');
+    if (r) body.append(makeArtwork(r));
+    const labels=elt('div','gem-labels');
+    labels.append(elt('h3','gem-title',g.label),elt('p','gem-artist',g.artist));
+    body.append(labels);card.append(top,body);
+    const stats=elt('div','gem-stats');
+    stats.append(elt('span','',`この曲 ${nf.format(g.songCount)} 件`),elt('span','',`このP 総計 ${nf.format(g.artistCount)} 件`));
+    card.append(stats);
+    const actions=elt('div','gem-actions');
+    const posts=elt('button','gem-posts','投稿を見る'); posts.type='button';
+    posts.addEventListener('click',()=>{
+      // Clear unrelated filters so the selected song's posts are actually visible.
+      STATE.period='all';
+      $('searchInput').value='';$('startDate').value='';$('endDate').value='';updatePeriodButtons();
+      STATE.focus={field:'song',key:g.key,label:`${g.label} / ${g.artist}`};STATE.page=0;
+      render();$('posts').scrollIntoView({behavior:'smooth',block:'start'});
+    });
+    actions.append(posts);
+    if (r) {
+      const chosen=chosenVideoFor(r,STATE.globalVideos,STATE.localVideos);
+      if (chosen) {
+        const link=elt('a','gem-video','♫ 動画を見る');link.href=chosen.url;link.target='_blank';link.rel='noopener noreferrer';actions.append(link);
+      } else {
+        const video=elt('button','gem-video','♫ 動画を探す');video.type='button';
+        video.addEventListener('click',()=>openVideoFinder(r));actions.append(video);
+      }
+    }
+    card.append(actions); target.append(card);
+  }
+  const suffix=groups.length<5?`（対象曲が${groups.length}曲のため、${groups.length}曲表示）`:'';
+  text('gemsFoot',`候補 ${nf.format(STATE.gemStats.eligibleCount)}曲から抽選 / 対象の曲は${STATE.gemStats.cutoff}件以下のリクエスト ${suffix}。ボカロPの総件数が少ないほど選ばれやすくなります。`);
+}
+
 function updatePeriodButtons() {
   document.querySelectorAll('[data-period]').forEach(btn => {const on=btn.dataset.period===STATE.period;btn.classList.toggle('active',on);btn.setAttribute('aria-pressed',String(on));});
   const p=periodFor(STATE.period,todayJST());
@@ -487,6 +546,50 @@ function download(kind) {
   document.body.append(anchor); anchor.click(); anchor.remove(); setTimeout(()=>URL.revokeObjectURL(objectUrl),1000);
 }
 
+function registrationFeedback(message, kind='neutral') {
+  const target = $('registrationResult');
+  target.hidden = false;
+  target.textContent = message;
+  target.className = 'registration-result ' + kind;
+}
+function openRegistration() {
+  const dialog = $('registrationDialog');
+  $('registerDate').value ||= todayJST();
+  $('registrationResult').hidden = true;
+  dialog.showModal();
+  $('registerUser').focus();
+}
+async function submitRegistration(event) {
+  event.preventDefault();
+  const form = $('registrationForm');
+  if (!form.reportValidity()) return;
+  const submit = $('registrationSubmit');
+  submit.disabled=true;
+  submit.textContent='登録しています…';
+  $('registrationResult').hidden=true;
+  const body = Object.fromEntries(new FormData(form));
+  try {
+    const response = await fetch('/api/register', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(body),
+      cache:'no-store'
+    });
+    const data = await response.json().catch(()=>({}));
+    if (!response.ok) throw new Error(data.error || `登録に失敗しました（HTTP ${response.status}）。`);
+    form.reset();
+    $('registerDate').value=todayJST();
+    registrationFeedback('✓ スプレッドシートに登録しました。ランキングを再読み込みしています。','success');
+    await loadRemote(true);
+    registrationFeedback('✓ 登録が完了しました。集計画面を確認するか、続けて入力できます。','success');
+  } catch(error) {
+    registrationFeedback('登録できませんでした：'+(error?.message || '通信に失敗しました。'),'error');
+  } finally {
+    submit.disabled=false;
+    submit.textContent='この内容で登録する';
+  }
+}
+
 async function setup() {
   STATE.dedupe=storageGet('voca-v3-dedupe',true)!==false; $('dedupeToggle').checked=STATE.dedupe;
   $('autoRefresh').checked=storageGet('voca-v3-autorefresh',true)!==false;
@@ -497,6 +600,11 @@ async function setup() {
   const gid = query.get('gid');
   if (gid && /^\d{1,20}$/.test(gid)) $('gidInput').value = gid;
   else {const savedGid=storageGet('voca-v3-gid','0'); if(/^\d{1,20}$/.test(String(savedGid))) $('gidInput').value = String(savedGid);}
+  $('registerBtn').addEventListener('click',openRegistration);
+  $('registrationClose').addEventListener('click',()=>$('registrationDialog').close());
+  $('registrationCancel').addEventListener('click',()=>$('registrationDialog').close());
+  $('registrationForm').addEventListener('submit',submitRegistration);
+  $('registrationDialog').addEventListener('click',e=>{if(e.target===$('registrationDialog')) $('registrationDialog').close();});
   $('refreshBtn').addEventListener('click',()=>loadRemote(true));
   $('gidInput').addEventListener('keydown',e=>{if(e.key === 'Enter') loadRemote(true);});
   $('demoBtn').addEventListener('click',()=>{try { useData(DEMO,'demo','架空のサンプルデータ'); } catch(e) {status(e.message,'error');}});
@@ -528,6 +636,7 @@ async function setup() {
   $('videoDialog').addEventListener('close',()=>{STATE.videoRequestId++;STATE.activeVideoRecord=null;});
   $('exportVideoLinks').addEventListener('click',downloadVideoLinks);
   $('resetLocalVideoLinks').addEventListener('click',()=>{if(!confirm('このブラウザで確定した動画リンクをすべて解除しますか？'))return; STATE.localVideos={};saveVideoLinks();});
+  $('rerollGems').addEventListener('click',shuffleGems);
   $('toggleOrganizers').addEventListener('click',()=>{STATE.showOrganizers=!STATE.showOrganizers;STATE.showAll.users=false;render();});
   const autoCheck=()=>{if(!$('autoRefresh').checked||STATE.source!=='sheet'||document.visibilityState==='hidden'||STATE.loading)return;if(Date.now()-STATE.lastAttemptAt>=5*60*1000) loadRemote(false);};
   setInterval(autoCheck,60*1000);document.addEventListener('visibilitychange',autoCheck);window.addEventListener('focus',autoCheck);
@@ -540,7 +649,7 @@ async function setup() {
   for (const b of document.querySelectorAll('[data-export]')) b.addEventListener('click',()=>download(b.dataset.export));
   $('prevBtn').addEventListener('click',()=>{STATE.page--;renderPosts();});
   $('nextBtn').addEventListener('click',()=>{STATE.page++;renderPosts();});
-  render();
+  render();renderGems();
   if (query.get('demo')==='1') $('demoBtn').click(); else loadRemote(false);
 }
 setup();

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="description" content="#ボカオバリクエスト のリクエスト楽曲、アーティスト、投稿者ランキングと月別投稿分布を可視化">
   <meta name="theme-color" content="#f5fbfd">
-  <title>ボカオバリクエスト | ランキング・投稿分析 v3.6</title>
+  <title>ボカオバリクエスト | ランキング・投稿分析 v3.8</title>
   <link rel="stylesheet" href="/styles.css">
   <script type="module" src="/app.js"></script>
 </head>
@@ -14,17 +14,38 @@
     <div class="header-inner">
       <a class="brand" href="#top" aria-label="ボカオバリクエスト 分析トップ">
         <span class="brand-mark" aria-hidden="true">♬</span>
-        <span class="brand-text">VOCALOID <strong>REQUESTS</strong><small>ボカオバリクエスト分析 <b class="version-pill">v3.6</b></small></span>
+        <span class="brand-text">VOCALOID <strong>REQUESTS</strong><small>ボカオバリクエスト分析 <b class="version-pill">v3.8</b></small></span>
       </a>
       <nav class="main-nav" aria-label="ページ内メニュー"><a href="#songs">楽曲</a><a href="#artists">アーティスト</a><a href="#months">月別分布</a><a href="#users">投稿者</a><a href="#settings">データ設定</a></nav>
+      <button class="register-nav-btn" id="registerBtn" type="button" aria-haspopup="dialog">＋ リクエスト登録</button>
       <button class="source-link share-top" id="shareBtn" type="button">✦ Xで共有</button><a class="source-link sheet-top" href="https://docs.google.com/spreadsheets/d/10R20NZZYk4FzQ29HN8NcCr7oeSxUcceFKzdMpp9AkUU/edit" target="_blank" rel="noopener noreferrer">元データ ↗</a>
     </div>
   </header>
+  <dialog id="registrationDialog" class="registration-dialog" aria-labelledby="registrationTitle">
+    <div class="registration-dialog-inner">
+      <div class="registration-head">
+        <div><span class="section-micro">ADD REQUEST / Google Sheets</span><h2 id="registrationTitle">リクエストを登録</h2><p>入力内容を元のスプレッドシートに追記します。</p></div>
+        <button id="registrationClose" class="registration-close" type="button" aria-label="閉じる">×</button>
+      </div>
+      <form id="registrationForm" class="registration-form">
+        <label>日付 <span>必須</span><input id="registerDate" name="date" type="date" required></label>
+        <label>ユーザー名 <span>必須</span><input id="registerUser" name="user" type="text" maxlength="100" autocomplete="off" placeholder="Xのユーザー名" required></label>
+        <label>曲名 <span>必須</span><input id="registerSong" name="song" type="text" maxlength="200" autocomplete="off" placeholder="リクエストされた曲名" required></label>
+        <label>ボカロP <span>必須</span><input id="registerArtist" name="artist" type="text" maxlength="160" autocomplete="off" placeholder="アーティスト・制作者名" required></label>
+        <label class="registration-wide">URL（X投稿リンク） <span>必須</span><input id="registerUrl" name="url" type="url" inputmode="url" maxlength="500" autocomplete="off" placeholder="https://x.com/.../status/12345" required></label>
+        <div class="registration-separator registration-wide"></div>
+        <label class="registration-wide">管理用パスワード <span>必須・入力内容は保存しません</span><input id="registerPassword" name="password" type="password" maxlength="256" autocomplete="off" placeholder="管理者が設定したパスワード" required></label>
+        <p class="registration-note registration-wide">登録は管理権限を持つ方のみ可能です。スプレッドシートの「日時／ユーザー／曲名／ボカロP／URL」の列に1行追加されます。</p>
+        <div id="registrationResult" class="registration-result registration-wide" role="status" aria-live="polite" hidden></div>
+        <div class="registration-actions registration-wide"><button type="button" class="btn register-cancel" id="registrationCancel">閉じる</button><button type="submit" class="btn btn-primary" id="registrationSubmit">この内容で登録する</button></div>
+      </form>
+    </div>
+  </dialog>
   <main class="container" id="top">
     <section class="hero">
       <div class="hero-main">
         <div class="eyebrow"><span class="signal-dot"></span> VOCALOID REQUEST ANALYTICS</div>
-        <h1><span class="gradient-text">#ボカオバリクエスト</span><br>リクエスト分析 <small class="hero-version">v3.6</small></h1>
+        <h1><span class="gradient-text">#ボカオバリクエスト</span><br>リクエスト分析 <small class="hero-version">v3.8</small></h1>
         <p>みんなのリクエストから、次に盛り上がる一曲を見つけよう。投稿傾向・人気曲・急上昇をリアルタイムにチェック。</p>
         <div class="hero-tags"><span>♬ 楽曲ランキング</span><span>✧ アーティスト</span><span>▤ 月別分布</span><span>♡ 投稿者</span><span>↗ トレンド比較</span></div>
         <a href="#settings" class="settings-jump">⚙ データ設定・更新はページ下部 ↓</a>
@@ -44,6 +65,20 @@
       <div class="kpi"><div class="kpi-label">リクエスト楽曲 <span>♫</span></div><strong id="countSongs">—</strong><small>曲名＋アーティストの組合せ</small></div>
       <div class="kpi"><div class="kpi-label">アーティスト <span>✧</span></div><strong id="countArtists">—</strong><small>ユニークなアーティスト</small></div>
       <div class="kpi"><div class="kpi-label">投稿ユーザー <span>♡</span></div><strong id="countUsers">—</strong><small>ユニークな投稿者</small></div>
+    </section>
+
+    <section class="hidden-gems panel" id="hiddenGems" aria-labelledby="gemsTitle">
+      <div class="gems-heading">
+        <div class="gems-heading-copy">
+          <span class="section-micro">DISCOVER / HIDDEN GEMS</span>
+          <h2 id="gemsTitle">埋もれたボカロ曲を発掘 <span aria-hidden="true">✦</span></h2>
+          <p>リクエスト数の少ない楽曲から、まだあまりリクエストされていないボカロPを優先してランダムに紹介します。</p>
+          <small>全期間・表記統合後のデータを使用（重複除外の設定を反映）</small>
+        </div>
+        <button type="button" id="rerollGems" class="gems-shuffle" aria-label="発掘する楽曲をもう一度選ぶ">↻ もう一度選ぶ</button>
+      </div>
+      <div class="gems-list" id="gemsList" aria-live="polite"><div class="gems-empty">データを読み込むとおすすめの楽曲を表示します。</div></div>
+      <p class="gems-foot" id="gemsFoot">曲名とボカロPの両方が登録されている曲が対象です。</p>
     </section>
 
     <section class="fresh-tracks" id="freshTracks" hidden aria-label="最近の初登場楽曲"><div><span class="section-micro">DISCOVER</span><h2>期間内の初登場楽曲 <span class="sparkle">✦</span></h2><p>過去に登場していない新しいリクエストをチェック</p></div><div class="fresh-items" id="freshItems"></div></section>
@@ -149,7 +184,7 @@
       <div class="video-link-export-actions"><button type="button" id="exportVideoLinks" class="btn btn-primary">確定リンクをJSON保存</button><button type="button" id="resetLocalVideoLinks" class="text-btn">このブラウザの確定を解除</button></div>
     </div>
     <div class="rules-note">集計基準：<strong>1行＝1リクエスト</strong>（重複除外ONの場合は同じ投稿URL・同じ楽曲を1件に統合）。表記ゆれは正規化＋登録済み統合ルールを適用。順位変動は選択した7日／30日とその直前の同期間を比較します。日付は日本時間を使用します。自動更新はページを開いている間のみ実行します。投稿ランキングでは初期状態でレギュラーDJ4名を除外しますが、その他の集計と投稿一覧には含まれます。</div>
-    <footer class="footer"><span>VOCALOID REQUESTS / #ボカオバリクエスト</span><span>v3.6 · Vercel + Google Sheets (read-only)</span></footer>
+    <footer class="footer"><span>VOCALOID REQUESTS / #ボカオバリクエスト</span><span>v3.8 · Vercel + Google Sheets (authenticated write)</span></footer>
   </main>
 </body>
 </html>

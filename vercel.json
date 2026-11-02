@@ -3,6 +3,7 @@
   "framework": null,
   "functions": {
     "api/sheet.js": { "maxDuration": 30 },
-    "api/vocadb.js": { "maxDuration": 15 }
+    "api/vocadb.js": { "maxDuration": 15 },
+    "api/register.js": { "maxDuration": 30 }
   }
 }
