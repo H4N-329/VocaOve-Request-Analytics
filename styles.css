@@ -1016,3 +1016,75 @@ h1 {
 @media(max-width:1150px){.gems-list{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:720px){.hidden-gems{padding:18px 13px;margin:15px 0}.gems-heading{align-items:flex-start;flex-direction:column;gap:13px}.gems-heading h2{font-size:20px}.gems-heading p{font-size:12px}.gems-shuffle{align-self:flex-start;padding:10px 16px;min-height:42px}.gems-list{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.gem-card{padding:12px 10px;min-height:218px}.gem-title{font-size:13px}.gem-artist{font-size:11px}.gem-actions{flex-direction:column}.gem-actions a,.gem-actions button{width:100%;min-height:37px}.gem-stats{margin:10px 0}.gem-stats span{font-size:9.5px}}
 @media(max-width:360px){.gems-list{grid-template-columns:1fr}.gem-actions{flex-direction:row}.gem-card{min-height:0}}
+
+
+/* v3.9 — expanded-ranking quick return, desktop and mobile */
+.rank-heading-actions {display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:8px;flex-shrink:0}
+.rank-collapse-top {
+  border:1.5px solid #0bbecf;
+  background:#eafcff;
+  color:#087d8a;
+  border-radius:9px;
+  padding:9px 13px;
+  font-size:12px;
+  font-weight:850;
+  min-height:40px;
+  white-space:nowrap;
+}
+.rank-collapse-top:hover {background:#cff7fa}
+.rank-quick-actions {
+  position:fixed;
+  z-index:30;
+  bottom:max(20px, env(safe-area-inset-bottom));
+  right:max(22px, env(safe-area-inset-right));
+  display:flex;
+  align-items:center;
+  gap:13px;
+  max-width:calc(100vw - 26px);
+  padding:9px 9px 9px 17px;
+  background:rgba(255,255,255,.97);
+  border:2px solid #19c5d2;
+  border-radius:999px;
+  box-shadow:0 10px 34px rgba(14,65,90,.20);
+  backdrop-filter:blur(12px);
+}
+.rank-quick-actions[hidden] {display:none!important}
+.rank-quick-label {font-size:12px;font-weight:800;color:#1a4961;white-space:nowrap}
+.rank-quick-collapse {
+  min-height:44px;
+  border:0;
+  border-radius:999px;
+  padding:10px 18px;
+  background:linear-gradient(110deg,#03b9c9,#7067ee);
+  color:#fff;
+  font-size:13px;
+  font-weight:900;
+  white-space:nowrap;
+}
+.rank-quick-collapse:hover {filter:brightness(.93)}
+@media (max-width:720px) {
+  .rank-heading-actions {gap:6px}
+  .rank-collapse-top {font-size:11px;padding:8px;min-height:38px}
+  .rank-quick-actions {
+    right:12px;
+    left:12px;
+    max-width:none;
+    bottom:max(12px,env(safe-area-inset-bottom));
+    padding:8px 8px 8px 13px;
+    justify-content:space-between;
+    gap:8px;
+  }
+  .rank-quick-label {font-size:11px;white-space:normal;line-height:1.3}
+  .rank-quick-collapse {min-height:45px;padding:10px 12px;font-size:12px;flex-shrink:0}
+}
+@media (max-width:380px) {
+  .rank-collapse-top {font-size:10px}
+  .rank-quick-label {font-size:10px}
+  .rank-quick-collapse {padding:10px;font-size:11px}
+}
+
+.rank-quick-buttons {display:flex;align-items:center;gap:7px}
+@media(max-width:720px){.rank-quick-buttons{gap:5px}.rank-quick-actions:has(.rank-quick-collapse:nth-child(2)){flex-wrap:wrap}.rank-quick-actions:has(.rank-quick-collapse:nth-child(2)) .rank-quick-buttons{width:100%}.rank-quick-actions:has(.rank-quick-collapse:nth-child(2)) .rank-quick-collapse{flex:1;padding:10px 7px}}
+
+/* Avoid stretching the adjacent card when just one ranking is expanded. */
+@media(min-width:721px){.rankings-grid{align-items:start}}

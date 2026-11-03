@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="description" content="#ボカオバリクエスト のリクエスト楽曲、アーティスト、投稿者ランキングと月別投稿分布を可視化">
   <meta name="theme-color" content="#f5fbfd">
-  <title>ボカオバリクエスト | ランキング・投稿分析 v3.8</title>
+  <title>ボカオバリクエスト | ランキング・投稿分析 v3.9</title>
   <link rel="stylesheet" href="/styles.css">
   <script type="module" src="/app.js"></script>
 </head>
@@ -14,7 +14,7 @@
     <div class="header-inner">
       <a class="brand" href="#top" aria-label="ボカオバリクエスト 分析トップ">
         <span class="brand-mark" aria-hidden="true">♬</span>
-        <span class="brand-text">VOCALOID <strong>REQUESTS</strong><small>ボカオバリクエスト分析 <b class="version-pill">v3.8</b></small></span>
+        <span class="brand-text">VOCALOID <strong>REQUESTS</strong><small>ボカオバリクエスト分析 <b class="version-pill">v3.9</b></small></span>
       </a>
       <nav class="main-nav" aria-label="ページ内メニュー"><a href="#songs">楽曲</a><a href="#artists">アーティスト</a><a href="#months">月別分布</a><a href="#users">投稿者</a><a href="#settings">データ設定</a></nav>
       <button class="register-nav-btn" id="registerBtn" type="button" aria-haspopup="dialog">＋ リクエスト登録</button>
@@ -45,7 +45,7 @@
     <section class="hero">
       <div class="hero-main">
         <div class="eyebrow"><span class="signal-dot"></span> VOCALOID REQUEST ANALYTICS</div>
-        <h1><span class="gradient-text">#ボカオバリクエスト</span><br>リクエスト分析 <small class="hero-version">v3.8</small></h1>
+        <h1><span class="gradient-text">#ボカオバリクエスト</span><br>リクエスト分析 <small class="hero-version">v3.9</small></h1>
         <p>みんなのリクエストから、次に盛り上がる一曲を見つけよう。投稿傾向・人気曲・急上昇をリアルタイムにチェック。</p>
         <div class="hero-tags"><span>♬ 楽曲ランキング</span><span>✧ アーティスト</span><span>▤ 月別分布</span><span>♡ 投稿者</span><span>↗ トレンド比較</span></div>
         <a href="#settings" class="settings-jump">⚙ データ設定・更新はページ下部 ↓</a>
@@ -84,12 +84,12 @@
     <section class="fresh-tracks" id="freshTracks" hidden aria-label="最近の初登場楽曲"><div><span class="section-micro">DISCOVER</span><h2>期間内の初登場楽曲 <span class="sparkle">✦</span></h2><p>過去に登場していない新しいリクエストをチェック</p></div><div class="fresh-items" id="freshItems"></div></section>
     <div class="rankings-grid">
       <section id="songs" class="panel ranking-panel" aria-labelledby="songTitle">
-        <div class="panel-heading"><div class="heading-group"><div class="section-micro">01 / TOP TRACKS</div><h2 id="songTitle">楽曲ランキング</h2><p>投稿数の多い楽曲順。期間を選ぶと順位の変動も確認できます</p></div><button class="export-btn" type="button" data-export="songs" title="楽曲ランキングのCSVを保存">↓ CSV</button></div>
+        <div class="panel-heading"><div class="heading-group"><div class="section-micro">01 / TOP TRACKS</div><h2 id="songTitle" tabindex="-1">楽曲ランキング</h2><p>投稿数の多い楽曲順。期間を選ぶと順位の変動も確認できます</p></div><div class="rank-heading-actions"><button class="rank-collapse-top" id="collapseSongsTop" type="button" hidden aria-controls="songRanking">上位10件に戻す ↑</button><button class="export-btn" type="button" data-export="songs" title="楽曲ランキングのCSVを保存">↓ CSV</button></div></div>
         <div class="ranking-list" id="songRanking"><div class="empty">読み込み中…</div></div>
         <button class="view-more" id="moreSongs" type="button" hidden>すべての楽曲を表示 <span>⌄</span></button>
       </section>
       <section id="artists" class="panel ranking-panel" aria-labelledby="artistTitle">
-        <div class="panel-heading"><div class="heading-group"><div class="section-micro">02 / TOP ARTISTS</div><h2 id="artistTitle">アーティストランキング</h2><p>リクエストされた回数が多い順</p></div><button class="export-btn" type="button" data-export="artists" title="アーティストランキングのCSVを保存">↓ CSV</button></div>
+        <div class="panel-heading"><div class="heading-group"><div class="section-micro">02 / TOP ARTISTS</div><h2 id="artistTitle" tabindex="-1">アーティストランキング</h2><p>リクエストされた回数が多い順</p></div><div class="rank-heading-actions"><button class="rank-collapse-top" id="collapseArtistsTop" type="button" hidden aria-controls="artistRanking">上位10件に戻す ↑</button><button class="export-btn" type="button" data-export="artists" title="アーティストランキングのCSVを保存">↓ CSV</button></div></div>
         <div class="ranking-list" id="artistRanking"><div class="empty">読み込み中…</div></div>
         <button class="view-more" id="moreArtists" type="button" hidden>すべてのアーティストを表示 <span>⌄</span></button>
       </section>
@@ -103,7 +103,7 @@
     </section>
 
     <section id="users" class="panel ranking-panel user-panel" aria-labelledby="userTitle">
-      <div class="panel-heading"><div class="heading-group"><div class="section-micro">04 / TOP REQUESTERS</div><h2 id="userTitle">投稿ランキング</h2><p>リクエスト投稿が多いユーザーを表示</p></div><button class="export-btn" type="button" data-export="users">↓ CSV</button></div>
+      <div class="panel-heading"><div class="heading-group"><div class="section-micro">04 / TOP REQUESTERS</div><h2 id="userTitle" tabindex="-1">投稿ランキング</h2><p>リクエスト投稿が多いユーザーを表示</p></div><div class="rank-heading-actions"><button class="rank-collapse-top" id="collapseUsersTop" type="button" hidden aria-controls="userRanking">上位10件に戻す ↑</button><button class="export-btn" type="button" data-export="users">↓ CSV</button></div></div>
       <div class="organizer-controls" aria-label="レギュラーDJのランキング表示設定">
         <div class="organizer-control-text">
           <strong>レギュラーDJの表示</strong>
@@ -184,7 +184,11 @@
       <div class="video-link-export-actions"><button type="button" id="exportVideoLinks" class="btn btn-primary">確定リンクをJSON保存</button><button type="button" id="resetLocalVideoLinks" class="text-btn">このブラウザの確定を解除</button></div>
     </div>
     <div class="rules-note">集計基準：<strong>1行＝1リクエスト</strong>（重複除外ONの場合は同じ投稿URL・同じ楽曲を1件に統合）。表記ゆれは正規化＋登録済み統合ルールを適用。順位変動は選択した7日／30日とその直前の同期間を比較します。日付は日本時間を使用します。自動更新はページを開いている間のみ実行します。投稿ランキングでは初期状態でレギュラーDJ4名を除外しますが、その他の集計と投稿一覧には含まれます。</div>
-    <footer class="footer"><span>VOCALOID REQUESTS / #ボカオバリクエスト</span><span>v3.8 · Vercel + Google Sheets (authenticated write)</span></footer>
+    <footer class="footer"><span>VOCALOID REQUESTS / #ボカオバリクエスト</span><span>v3.9 · Vercel + Google Sheets (authenticated write)</span></footer>
   </main>
+  <div id="rankQuickActions" class="rank-quick-actions" hidden role="group" aria-label="ランキングの表示を戻す">
+    <span id="rankQuickLabel" class="rank-quick-label">全件表示中</span>
+    <div id="rankQuickButtons" class="rank-quick-buttons"></div>
+  </div>
 </body>
 </html>

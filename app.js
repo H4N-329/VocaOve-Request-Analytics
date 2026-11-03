@@ -410,7 +410,9 @@ function renderRanking(kind) {
   const target = $({songs:'songRanking', artists:'artistRanking', users:'userRanking'}[kind]);
   const more = $({songs:'moreSongs',artists:'moreArtists',users:'moreUsers'}[kind]);
   clear(target);
-  if (!groups.length) { target.append(elt('div','empty', STATE.records.length ? '条件に合う集計対象がありません。列の設定も確認してください。' : 'データがありません。')); more.hidden = true; return; }
+  const topCollapse=$({songs:'collapseSongsTop',artists:'collapseArtistsTop',users:'collapseUsersTop'}[kind]);
+  if (groups.length<=10) STATE.showAll[kind]=false;
+  if (!groups.length) { target.append(elt('div','empty', STATE.records.length ? '条件に合う集計対象がありません。列の設定も確認してください。' : 'データがありません。')); more.hidden = true; topCollapse.hidden=true; scheduleRankQuickUpdate(); return; }
   const length = STATE.showAll[kind] ? groups.length : Math.min(kind === 'users' ? 10 : 10, groups.length);
   const top = groups.slice(0, length), max = groups[0].count;
   for (const g of top) {
@@ -442,7 +444,61 @@ function renderRanking(kind) {
     target.append(button);
   }
   more.hidden = groups.length <= 10;
-  more.textContent = STATE.showAll[kind] ? '上位10件に戻す  ⌃' : `全${nf.format(groups.length)}件を表示  ⌄`;
+  more.textContent = STATE.showAll[kind] ? '上位10件に戻す  ↑' : `全${nf.format(groups.length)}件を表示  ⌄`;
+  more.setAttribute('aria-expanded',String(STATE.showAll[kind]));
+  topCollapse.hidden = !STATE.showAll[kind] || groups.length<=10;
+  scheduleRankQuickUpdate();
+}
+// v3.9: フルランキング表示中は、スクロール位置に応じて折りたたみ操作を固定表示。
+const RANK_SECTIONS = {songs:'songs', artists:'artists', users:'users'};
+const RANK_TITLES = {songs:'楽曲', artists:'アーティスト', users:'投稿'};
+let rankQuickFrame = 0;
+function scheduleRankQuickUpdate() {
+  if (rankQuickFrame) return;
+  rankQuickFrame = window.requestAnimationFrame(() => { rankQuickFrame=0; updateRankQuickActions(); });
+}
+function updateRankQuickActions() {
+  const bar=$('rankQuickActions');
+  if (!bar) return;
+  const topLimit=document.querySelector('.site-header')?.getBoundingClientRect().height || 72;
+  const bottomLimit=window.innerHeight-38;
+  const visible=[];
+  for (const [kind,id] of Object.entries(RANK_SECTIONS)) {
+    if (!STATE.showAll[kind]) continue;
+    const rect=$(id).getBoundingClientRect();
+    const overlap=Math.max(0,Math.min(rect.bottom,bottomLimit)-Math.max(rect.top,topLimit));
+    if (overlap>=60) visible.push(kind);
+  }
+  bar.hidden=visible.length===0;
+  if (!visible.length) {bar.dataset.kinds='';return;}
+  const keys=visible.join(',');
+  if (bar.dataset.kinds===keys) return;
+  bar.dataset.kinds=keys;
+  text('rankQuickLabel',visible.length===1?`${RANK_TITLES[visible[0]]}ランキング 全件表示中`:'ランキング 全件表示中');
+  const buttons=$('rankQuickButtons');clear(buttons);
+  for (const kind of visible) {
+    const button=elt('button','rank-quick-collapse',visible.length===1?'↑ 上位10件に戻す':`↑ ${RANK_TITLES[kind]}を戻す`);
+    button.type='button';
+    button.setAttribute('aria-label',`${RANK_TITLES[kind]}ランキングを上位10件に戻す`);
+    button.addEventListener('click',()=>collapseRanking(kind));
+    buttons.append(button);
+  }
+}
+function collapseRanking(kind) {
+  if (!STATE.showAll[kind]) return;
+  const section=$(RANK_SECTIONS[kind]);
+  const headerHeight=document.querySelector('.site-header')?.getBoundingClientRect().height || 72;
+  const top=Math.max(0,window.scrollY+section.getBoundingClientRect().top-headerHeight-12);
+  STATE.showAll[kind]=false;
+  renderRanking(kind);
+  // 長いページをスムーズスクロールで延々と戻らないよう、見出しへ即時に戻す。
+  window.scrollTo({top,behavior:'instant'});
+  section.querySelector('h2')?.focus({preventScroll:true});
+  scheduleRankQuickUpdate();
+}
+function toggleRanking(kind) {
+  if (STATE.showAll[kind]) collapseRanking(kind);
+  else { STATE.showAll[kind]=true;renderRanking(kind);scheduleRankQuickUpdate(); }
 }
 function renderMonths() {
   const a = STATE.analysis;
@@ -644,8 +700,11 @@ async function setup() {
   $('resetBtn').addEventListener('click',resetFilters);
   for (const kind of ['Songs','Artists','Users']) {
     const k = kind.toLowerCase();
-    $('more'+kind).addEventListener('click',()=>{STATE.showAll[k]=!STATE.showAll[k]; renderRanking(k);});
+    $('more'+kind).addEventListener('click',()=>toggleRanking(k));
+    $('collapse'+kind+'Top').addEventListener('click',()=>collapseRanking(k));
   }
+  window.addEventListener('scroll',scheduleRankQuickUpdate,{passive:true});
+  window.addEventListener('resize',scheduleRankQuickUpdate);
   for (const b of document.querySelectorAll('[data-export]')) b.addEventListener('click',()=>download(b.dataset.export));
   $('prevBtn').addEventListener('click',()=>{STATE.page--;renderPosts();});
   $('nextBtn').addEventListener('click',()=>{STATE.page++;renderPosts();});
