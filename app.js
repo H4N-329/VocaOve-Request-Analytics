@@ -4,6 +4,8 @@ import { visibleUserRanking, ORGANIZER_NAMES } from './lib/organizers.mjs';
 import { songVideoLinks, inheritVideoUrls } from './lib/video.mjs';
 import { cleanVideoMap, chosenVideoFor } from './lib/vocadb.mjs';
 import { recommendHiddenGems } from './lib/discovery.mjs';
+import { aliasCandidates, dailyCounts } from './lib/v4.mjs';
+import { setupDjList } from './dj-list.js';
 
 const $ = id => document.getElementById(id);
 const nf = new Intl.NumberFormat('ja-JP');
@@ -237,6 +239,76 @@ function renderAliasList() {
 }
 function saveAliasesAndRender() {STATE.localAliases=cleanAliases(STATE.localAliases); storageSet('voca-v3-aliases',STATE.localAliases);refreshAliasState();renderAliasList();rebuildRecords();}
 
+function renderDailyHeatmap() {
+  const target = $('dailyHeat');
+  clear(target);
+  const counts = dailyCounts(STATE.filtered);
+  const dates = [...counts.keys()].sort();
+  const period = periodFor(STATE.period, todayJST());
+  const start = period.start || $('startDate').value || dates[0];
+  const end = period.end || $('endDate').value || dates.at(-1);
+  text('dailyHeatSummary', `${nf.format(STATE.analysis.datedCount)}件のリクエスト（日付なし ${nf.format(STATE.analysis.undatedCount)}件）`);
+  if (!start || !end || start > end) {
+    target.append(elt('p', 'subtle', '選択した条件に日付のあるリクエストがありません。'));
+    return;
+  }
+  const date = new Date(start + 'T00:00:00Z');
+  const last = new Date(end + 'T00:00:00Z');
+  const mondayOffset = (date.getUTCDay() + 6) % 7;
+  for (let i = 0; i < mondayOffset; i++) {
+    const blank = elt('span', 'heat-blank');
+    blank.setAttribute('aria-hidden', 'true');
+    target.append(blank);
+  }
+  const max = Math.max(1, ...counts.values());
+  while (date <= last) {
+    const iso = date.toISOString().slice(0, 10);
+    const count = counts.get(iso) || 0;
+    const day = elt('div', 'heat-day');
+    day.dataset.level = count ? String(Math.ceil(4 * count / max)) : '0';
+    day.title = `${iso}・${count}件`;
+    day.setAttribute('aria-label', day.title);
+    day.append(elt('span', '', iso.slice(5).replace('-', '/')), elt('strong', '', String(count)));
+    target.append(day);
+    date.setUTCDate(date.getUTCDate() + 1);
+  }
+}
+
+function renderAliasSuggestions() {
+  const target = $('aliasSuggestionsList');
+  clear(target);
+  // 承認済みの統合ルールを適用し、全期間のデータから候補を出す。
+  const records = createRecords(STATE.data, STATE.mapping, STATE.aliases);
+  for (const candidate of aliasCandidates(records)) {
+    const row = elt('div', 'alias-suggestion');
+    const description = elt('div', 'alias-suggestion-copy');
+    description.append(elt('strong', '', candidate.type === 'songs' ? `曲名 / ${candidate.artist}` : 'ボカロP'));
+    description.append(elt('p', 'subtle', candidate.labels.map(item => `${item.label}（${item.count}件）`).join(' / ')));
+    const select = elt('select');
+    select.setAttribute('aria-label', '統一する表記');
+    for (const item of candidate.labels) {
+      const option = elt('option', '', item.label);
+      option.value = item.label;
+      select.append(option);
+    }
+    const approve = elt('button', 'btn', 'この表記に統合');
+    approve.type = 'button';
+    approve.addEventListener('click', () => {
+      const canonical = select.value;
+      for (const item of candidate.labels) {
+        if (normalizeName(item.label) !== normalizeName(canonical)) {
+          STATE.localAliases[candidate.type][normalizeName(item.label)] = canonical;
+        }
+      }
+      saveAliasesAndRender();
+      status('表記の統合ルールを保存し、このブラウザの集計に反映しました。', 'success');
+    });
+    row.append(description, select, approve);
+    target.append(row);
+  }
+  if (!target.children.length) target.append(elt('p', 'subtle', '確認が必要な表記ゆれ候補はありません。'));
+}
+
 
 function restoreMapping(guessed) {
   if (STATE.source !== 'sheet') return guessed;
@@ -375,6 +447,8 @@ function render() {
   for (const kind of ['songs', 'artists', 'users']) renderRanking(kind);
   renderMonths();
   renderPosts();
+  renderDailyHeatmap();
+  renderAliasSuggestions();
 }
 function updateFocus() {
   const chip = $('focusChip');
@@ -647,6 +721,7 @@ async function submitRegistration(event) {
 }
 
 async function setup() {
+  setupDjList();
   STATE.dedupe=storageGet('voca-v3-dedupe',true)!==false; $('dedupeToggle').checked=STATE.dedupe;
   $('autoRefresh').checked=storageGet('voca-v3-autorefresh',true)!==false;
   await loadGlobalAliases();
