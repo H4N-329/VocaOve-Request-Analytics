@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseCSV, parseSheetCSV, parsePostDate, guessMapping, createRecords, filterRecords, aggregateAll, csvExport, safeHttpUrl } from '../lib/analytics.mjs';
+import { parseCSV, parseSheetCSV, parsePostDate, guessMapping, restoreColumnMapping, createRecords, filterRecords, aggregateAll, csvExport, safeHttpUrl } from '../lib/analytics.mjs';
 
 const csv = '曲名,アーティスト,ユーザー名,投稿日,投稿URL\r\n' +
   '星屑エコー,Producer A,@alpha,2026/10/31,https://x.com/a/status/1\r\n' +
@@ -52,4 +52,35 @@ test('CSV export prevents spreadsheet formula injection; links reject scripts', 
   assert.match(csvExport([['title','count'],['=1+2',2]]), /"'=1\+2"/);
   assert.equal(safeHttpUrl('javascript:alert(1)'), null);
   assert.match(safeHttpUrl('https://x.com/name/status/1'), /^https:\/\//);
+});
+
+test('header-only official sheet maps its date column and produces zero counts', () => {
+  const { headers, data } = parseSheetCSV('日時,ユーザー,曲名,ボカロP,URL,動画URL\n');
+  const mapping = guessMapping(headers, data);
+  assert.equal(mapping.date, 0);
+  assert.equal(mapping.video, 5);
+  const analysis = aggregateAll(createRecords(data, mapping));
+  assert.equal(analysis.rowCount, 0);
+  assert.deepEqual(analysis.songs, []);
+});
+
+test('saved disabled columns stay disabled after reload and header reordering', () => {
+  const headers = ['URL', '曲名', '日時', 'ボカロP', 'ユーザー'];
+  const guessed = guessMapping(headers);
+  const mapping = restoreColumnMapping(headers, guessed, { url: null, song: '曲名', date: '日時' });
+  assert.equal(mapping.url, -1);
+  assert.equal(mapping.song, 1);
+  assert.equal(mapping.date, 2);
+  assert.deepEqual(restoreColumnMapping(headers, guessed, null), guessed);
+});
+
+test('saved overrides never assign the same source column to two fields', () => {
+  const headers = ['曲名', 'ボカロP', 'ユーザー'];
+  const guessed = guessMapping(headers);
+  const mapping = restoreColumnMapping(headers, guessed, { artist: '曲名' });
+  assert.equal(mapping.artist, 0);
+  assert.equal(mapping.song, -1);
+  const duplicates = restoreColumnMapping(headers, guessed, { song: '曲名', artist: '曲名' });
+  assert.equal(duplicates.song, 0);
+  assert.equal(duplicates.artist, -1);
 });

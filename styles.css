@@ -5,6 +5,7 @@
   --cyan:#7ee2e3; --soft:#28233a; --shadow:0 18px 65px rgba(0,0,0,.13);
 }
 .v4-panel {margin:24px 0;padding:24px}
+.heat-navigation {display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin:12px 0;font-size:12px}
 .daily-heat,.heat-weekdays {display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px;max-width:640px}
 .heat-weekdays {text-align:center;color:var(--muted);font-size:12px;margin:16px 0 6px}
 .daily-heat {max-height:420px;overflow:auto;padding-right:4px}

@@ -1,17 +1,18 @@
-import { FIELDS, parseSheetCSV, guessMapping, createRecords, filterRecords, aggregateAll, safeHttpUrl, csvExport, normalizeName, userKey } from './lib/analytics.mjs';
+import { FIELDS, parseSheetCSV, guessMapping, restoreColumnMapping, createRecords, filterRecords, aggregateAll, safeHttpUrl, csvExport, normalizeName, userKey } from './lib/analytics.mjs';
 import { combinedAliases, cleanAliases, removeDuplicateRequests, periodFor, computeTrends, makeTrends } from './lib/v3.mjs';
 import { visibleUserRanking, ORGANIZER_NAMES } from './lib/organizers.mjs';
 import { songVideoLinks, inheritVideoUrls } from './lib/video.mjs';
 import { cleanVideoMap, chosenVideoFor } from './lib/vocadb.mjs';
 import { recommendHiddenGems } from './lib/discovery.mjs';
-import { aliasCandidates, dailyCounts } from './lib/v4.mjs';
+import { aliasCandidates, dailyCounts, heatmapWindow } from './lib/v4.mjs';
 import { setupDjList } from './dj-list.js';
 
 const $ = id => document.getElementById(id);
 const nf = new Intl.NumberFormat('ja-JP');
 const STATE = {
-  headers: [], data: [], records: [], filtered: [], analysis: null, mapping: {},
+  headers: [], data: [], rawRecords: [], records: [], filtered: [], orderedPosts: [], analysis: null, mapping: {},
   loading: false, source: 'sheet', gid: '0', page: 0, focus: null,
+  sheetRequestId: 0, sheetController: null, heatPage: 0,
   showAll: { songs: false, artists: false, users: false },
   period: 'all', trend: null, aliases: {songs:{},artists:{},users:{}},
   globalAliases:{songs:{},artists:{},users:{}}, localAliases:{songs:{},artists:{},users:{}},
@@ -54,15 +55,21 @@ function readableTime(when) {return new Intl.DateTimeFormat('ja-JP',{timeZone:'A
 function storageGet(key, fallback) { try { const item=localStorage.getItem(key); return item === null ? fallback : JSON.parse(item); } catch {return fallback;} }
 function storageSet(key, value) { try {localStorage.setItem(key,JSON.stringify(value));} catch {} }
 function refreshAliasState() { STATE.aliases=combinedAliases(STATE.globalAliases, STATE.localAliases); }
+async function loadConfig(path) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10000);
+  try {
+    const response = await fetch(path, {cache:'no-store', signal:controller.signal});
+    return response.ok ? await response.json() : {};
+  } catch { return {}; }
+  finally { clearTimeout(timeout); }
+}
 async function loadGlobalAliases() {
-  try { const response=await fetch('/aliases.json',{cache:'no-store'}); if(response.ok) STATE.globalAliases=cleanAliases(await response.json()); } catch {}
+  STATE.globalAliases=cleanAliases(await loadConfig('/aliases.json'));
   STATE.localAliases=cleanAliases(storageGet('voca-v3-aliases',{})); refreshAliasState(); renderAliasList();
 }
 async function loadVideoLinks() {
-  try {
-    const res=await fetch('/video-links.json',{cache:'no-store'});
-    if(res.ok) STATE.globalVideos=cleanVideoMap(await res.json());
-  } catch { STATE.globalVideos={}; }
+  STATE.globalVideos=cleanVideoMap(await loadConfig('/video-links.json'));
   STATE.localVideos=cleanVideoMap(storageGet('voca-v3-confirmed-videos',{}));
   updateVideoCount();
 }
@@ -153,11 +160,13 @@ async function openVideoFinder(r) {
 }
 
 function rebuildRecords(shouldRender = true) {
-  const raw=inheritVideoUrls(createRecords(STATE.data,STATE.mapping,STATE.aliases));
+  STATE.rawRecords = createRecords(STATE.data,STATE.mapping,STATE.aliases);
+  const raw=inheritVideoUrls(STATE.rawRecords);
   const result=removeDuplicateRequests(raw,STATE.dedupe);
   STATE.records=result.records; STATE.duplicateCount=result.removed;
   shuffleGems();
   text('dedupeInfo', `現在 ${nf.format(STATE.duplicateCount)} 行を重複として除外中。※ 同じ投稿URL＋同じ楽曲・アーティストの組合せだけを除外します。URLのない行は除外しません。`);
+  renderAliasSuggestions();
   if (shouldRender) render();
 }
 function shuffleGems() {
@@ -247,22 +256,25 @@ function renderDailyHeatmap() {
   const period = periodFor(STATE.period, todayJST());
   const start = period.start || $('startDate').value || dates[0];
   const end = period.end || $('endDate').value || dates.at(-1);
+  const heatWindow = heatmapWindow(start, end, STATE.heatPage);
+  STATE.heatPage = heatWindow.page;
+  $('heatOlder').disabled = heatWindow.page >= heatWindow.pages - 1;
+  $('heatNewer').disabled = heatWindow.page === 0;
+  $('heatNavigation').hidden = !heatWindow.dates.length;
   text('dailyHeatSummary', `${nf.format(STATE.analysis.datedCount)}件のリクエスト（日付なし ${nf.format(STATE.analysis.undatedCount)}件）`);
-  if (!start || !end || start > end) {
+  if (!heatWindow.dates.length) {
     target.append(elt('p', 'subtle', '選択した条件に日付のあるリクエストがありません。'));
     return;
   }
-  const date = new Date(start + 'T00:00:00Z');
-  const last = new Date(end + 'T00:00:00Z');
-  const mondayOffset = (date.getUTCDay() + 6) % 7;
+  text('heatRange', `${heatWindow.dates[0]}〜${heatWindow.dates.at(-1)}（${heatWindow.page + 1} / ${heatWindow.pages}）`);
+  const mondayOffset = (new Date(heatWindow.dates[0] + 'T00:00:00Z').getUTCDay() + 6) % 7;
   for (let i = 0; i < mondayOffset; i++) {
     const blank = elt('span', 'heat-blank');
     blank.setAttribute('aria-hidden', 'true');
     target.append(blank);
   }
   const max = Math.max(1, ...counts.values());
-  while (date <= last) {
-    const iso = date.toISOString().slice(0, 10);
+  for (const iso of heatWindow.dates) {
     const count = counts.get(iso) || 0;
     const day = elt('div', 'heat-day');
     day.dataset.level = count ? String(Math.ceil(4 * count / max)) : '0';
@@ -270,7 +282,6 @@ function renderDailyHeatmap() {
     day.setAttribute('aria-label', day.title);
     day.append(elt('span', '', iso.slice(5).replace('-', '/')), elt('strong', '', String(count)));
     target.append(day);
-    date.setUTCDate(date.getUTCDate() + 1);
   }
 }
 
@@ -278,8 +289,7 @@ function renderAliasSuggestions() {
   const target = $('aliasSuggestionsList');
   clear(target);
   // 承認済みの統合ルールを適用し、全期間のデータから候補を出す。
-  const records = createRecords(STATE.data, STATE.mapping, STATE.aliases);
-  for (const candidate of aliasCandidates(records)) {
+  for (const candidate of aliasCandidates(STATE.rawRecords)) {
     const row = elt('div', 'alias-suggestion');
     const description = elt('div', 'alias-suggestion-copy');
     description.append(elt('strong', '', candidate.type === 'songs' ? `曲名 / ${candidate.artist}` : 'ボカロP'));
@@ -312,17 +322,7 @@ function renderAliasSuggestions() {
 
 function restoreMapping(guessed) {
   if (STATE.source !== 'sheet') return guessed;
-  try {
-    const saved = JSON.parse(localStorage.getItem('voca-mapping:' + STATE.gid) || '{}');
-    const next = {...guessed};
-    for (const field of FIELDS) {
-      if (typeof saved[field] === 'string') {
-        const idx = STATE.headers.indexOf(saved[field]);
-        if (idx >= 0) next[field] = idx;
-      }
-    }
-    return next;
-  } catch { return guessed; }
+  return restoreColumnMapping(STATE.headers, guessed, storageGet('voca-mapping:' + STATE.gid, {}));
 }
 
 function updateMappingUI() {
@@ -355,13 +355,13 @@ function applyMapping(next) {
   } catch { /* Storage may be unavailable in private mode. */ }
   render();
 }
-function useData(csv, source, label) {
+function useData(csv, source, label, gid = $('gidInput').value.trim() || '0') {
   const parsed = parseSheetCSV(csv);
-  if (!parsed.headers.length || !parsed.data.length) throw new Error('見出し行とデータ行があるCSVを指定してください。');
+  if (source !== 'sheet') cancelRemoteLoad();
   STATE.source = source;
   STATE.headers = parsed.headers;
   STATE.data = parsed.data;
-  STATE.gid = $('gidInput').value.trim() || '0';
+  STATE.gid = gid;
   const mapping = restoreMapping(guessMapping(parsed.headers, parsed.data));
   STATE.mapping = mapping;
   updateMappingUI();
@@ -369,22 +369,34 @@ function useData(csv, source, label) {
   const missing = ['song','artist','user','date'].filter(field => mapping[field] < 0);
   status(`${label}：${nf.format(parsed.data.length)}行・${parsed.headers.length}列を読み込みました。` + (STATE.duplicateCount ? ` 重複 ${STATE.duplicateCount}行を除外。` : '') + (missing.length ? ' 「列の設定」を確認してください。' : ''), source === 'demo' ? 'demo' : 'success');
 }
+function cancelRemoteLoad() {
+  STATE.sheetRequestId++;
+  STATE.sheetController?.abort();
+  STATE.sheetController = null;
+  STATE.loading = false;
+  $('refreshBtn').disabled = false;
+}
 async function loadRemote(manual = false) {
   const gid = $('gidInput').value.trim() || '0';
   if (!/^\d{1,20}$/.test(gid)) { status('gidは数字のみで指定してください。', 'error'); return; }
-  if (STATE.loading) return;
+  cancelRemoteLoad();
+  const requestId = STATE.sheetRequestId;
+  const controller = new AbortController();
+  STATE.sheetController = controller;
+  const timeout = setTimeout(() => controller.abort(), 20000);
   STATE.loading = true; STATE.lastAttemptAt=Date.now();
   storageSet('voca-v3-gid',gid);
   $('refreshBtn').disabled = true;
   status('Googleスプレッドシートからデータを取得しています…');
   try {
-    const response = await fetch(`/api/sheet?gid=${encodeURIComponent(gid)}${manual ? '&refresh=1' : ''}`, {cache:'no-store'});
+    const response = await fetch(`/api/sheet?gid=${encodeURIComponent(gid)}${manual ? '&refresh=1' : ''}`, {cache:'no-store', signal: controller.signal});
     if (!response.ok) {
       let detail = `HTTP ${response.status}`;
       try { detail = (await response.json()).error || detail; } catch {}
       throw new Error(detail);
     }
     const body = await response.text();
+    if (requestId !== STATE.sheetRequestId) return;
     if (body.length > MAX_CSV_SIZE * 2) throw new Error('データが大きすぎます。5MB未満のCSVを使用してください。');
     if (STATE.source === 'sheet' && STATE.lastCSV === body && STATE.lastGid === gid) {
       status('Google Sheetsを確認しました。前回から変更はありません。','success');
@@ -393,15 +405,24 @@ async function loadRemote(manual = false) {
       if (JSON.stringify(parsed.headers) === JSON.stringify(STATE.headers)) {
         STATE.data=parsed.data;rebuildRecords();
         status(`Google Sheetsの更新を反映しました。${nf.format(parsed.data.length)}行を読み込み、重複${STATE.duplicateCount}行を除外しています。`,'success');
-      } else useData(body, 'sheet', 'Google Sheets');
+      } else useData(body, 'sheet', 'Google Sheets', gid);
     } else {
-      useData(body, 'sheet', 'Google Sheets');
+      useData(body, 'sheet', 'Google Sheets', gid);
     }
     STATE.lastCSV=body; STATE.lastGid=gid; STATE.lastFetchedAt=Date.now();
     text('lastUpdated',`最終更新：${readableTime(STATE.lastFetchedAt)}（日本時間）`);
   } catch (e) {
-    status(`シートを取得できませんでした：${e.message} サンプル表示かCSV読み込みでも動作確認できます。`, 'error');
-  } finally { STATE.loading = false; $('refreshBtn').disabled = false; }
+    if (requestId !== STATE.sheetRequestId) return;
+    const message = controller.signal.aborted ? '接続がタイムアウトしました。再度更新してください。' : e.message;
+    status(`シートを取得できませんでした：${message} サンプル表示かCSV読み込みでも動作確認できます。`, 'error');
+  } finally {
+    clearTimeout(timeout);
+    if (requestId === STATE.sheetRequestId) {
+      STATE.loading = false;
+      STATE.sheetController = null;
+      $('refreshBtn').disabled = false;
+    }
+  }
 }
 
 function resetFilters() {
@@ -434,6 +455,8 @@ function render() {
   STATE.filtered = filterRecords(STATE.records, {
     query: $('searchInput').value, start: p.start || $('startDate').value, end: p.end || $('endDate').value, focus: STATE.focus
   });
+  STATE.orderedPosts = [...STATE.filtered].sort((a,b) => (b.date||'').localeCompare(a.date||'') || b.index-a.index);
+  STATE.heatPage = 0;
   STATE.trend=computeTrends(STATE.records,{mode:STATE.period,today:todayJST(),query:$('searchInput').value,focus:STATE.focus});
   STATE.analysis = aggregateAll(STATE.filtered);
   recalcUserTrend(p);
@@ -448,7 +471,6 @@ function render() {
   renderMonths();
   renderPosts();
   renderDailyHeatmap();
-  renderAliasSuggestions();
 }
 function updateFocus() {
   const chip = $('focusChip');
@@ -619,7 +641,7 @@ function renderMonths() {
 }
 function renderPosts() {
   const target = $('postsBody'); clear(target);
-  const ordered = [...STATE.filtered].sort((a,b) => (b.date||'').localeCompare(a.date||'') || b.index-a.index);
+  const ordered = STATE.orderedPosts;
   const pages = Math.max(1,Math.ceil(ordered.length / 15)); STATE.page = Math.min(STATE.page,pages-1);
   const visible = ordered.slice(STATE.page*15,(STATE.page+1)*15);
   if (!visible.length) {
@@ -724,8 +746,7 @@ async function setup() {
   setupDjList();
   STATE.dedupe=storageGet('voca-v3-dedupe',true)!==false; $('dedupeToggle').checked=STATE.dedupe;
   $('autoRefresh').checked=storageGet('voca-v3-autorefresh',true)!==false;
-  await loadGlobalAliases();
-  await loadVideoLinks();
+  await Promise.all([loadGlobalAliases(), loadVideoLinks()]);
   updatePeriodButtons();
   const query = new URLSearchParams(location.search);
   const gid = query.get('gid');
@@ -741,11 +762,17 @@ async function setup() {
   $('demoBtn').addEventListener('click',()=>{try { useData(DEMO,'demo','架空のサンプルデータ'); } catch(e) {status(e.message,'error');}});
   $('csvFile').addEventListener('change',async e=>{
     const file = e.target.files?.[0]; if (!file) return;
+    e.target.value = '';
+    cancelRemoteLoad();
+    const requestId = STATE.sheetRequestId;
     try {
       if (file.size > MAX_CSV_SIZE) throw new Error('5MB以下のCSVファイルを選択してください。');
-      useData(await file.text(),'file',`ローカルCSV（${file.name}）`);
-    } catch(err) { status(`CSVを読み込めませんでした：${err.message}`,'error'); }
-    e.target.value = '';
+      const csv = await file.text();
+      if (requestId !== STATE.sheetRequestId) return;
+      useData(csv,'file',`ローカルCSV（${file.name}）`);
+    } catch(err) {
+      if (requestId === STATE.sheetRequestId) status(`CSVを読み込めませんでした：${err.message}`,'error');
+    }
   });
   $('mappingForm').addEventListener('submit',e=>{
     e.preventDefault(); if (!STATE.headers.length) return;
@@ -773,6 +800,8 @@ async function setup() {
   setInterval(autoCheck,60*1000);document.addEventListener('visibilitychange',autoCheck);window.addEventListener('focus',autoCheck);
   $('shareBtn').addEventListener('click',()=>{const message=`#ボカオバリクエスト 人気曲ランキングをチェック！\n${location.origin}${location.pathname}\n#ボカロ`;window.open('https://twitter.com/intent/tweet?text='+encodeURIComponent(message),'_blank','noopener,noreferrer');});
   $('resetBtn').addEventListener('click',resetFilters);
+  $('heatOlder').addEventListener('click',()=>{STATE.heatPage++;renderDailyHeatmap();});
+  $('heatNewer').addEventListener('click',()=>{STATE.heatPage--;renderDailyHeatmap();});
   for (const kind of ['Songs','Artists','Users']) {
     const k = kind.toLowerCase();
     $('more'+kind).addEventListener('click',()=>toggleRanking(k));
@@ -783,7 +812,7 @@ async function setup() {
   for (const b of document.querySelectorAll('[data-export]')) b.addEventListener('click',()=>download(b.dataset.export));
   $('prevBtn').addEventListener('click',()=>{STATE.page--;renderPosts();});
   $('nextBtn').addEventListener('click',()=>{STATE.page++;renderPosts();});
-  render();renderGems();
+  render();renderGems();renderAliasSuggestions();
   if (query.get('demo')==='1') $('demoBtn').click(); else loadRemote(false);
 }
 setup();
